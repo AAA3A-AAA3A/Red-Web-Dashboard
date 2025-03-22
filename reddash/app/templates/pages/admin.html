@@ -113,9 +113,9 @@
                                 <form action="" method="POST" role="form" enctype="multipart/form-data">
                                     {{ dashboard_actions_form.hidden_tag() }}
                                     {{ dashboard_actions_form.lock(class="btn mb-0 bg-gradient-" + variables["meta"]["color"] + " btn-md my-4", onclick="return confirmLock(event);") }}
-                                    <p><i>{{ _("This will lock the dashboard and prevent anyone from accessing control panels. Website administrators will still have access, and users will still be able to login through Discord Open Authentication.") }}</i></p>
+                                    <p><i>{{ _("This will lock the dashboard and prevent anyone from accessing control panels. bot owners will still have access, and users will still be able to login through Discord Open Authentication.") }}</i></p>
                                     {{ dashboard_actions_form.refresh_sessions(class="btn mb-0 bg-gradient-" + variables["meta"]["color"] + " btn-md my-4", onclick="return confirmRefreshSessions(event);") }}
-                                    <p><i>{{ _("This will log out all active users and require them to re-authenticate, including website administrators.") }}</i></p>
+                                    <p><i>{{ _("This will log out all active users and require them to re-authenticate, including bot owners.") }}</i></p>
                                 </form>
                             </div>
                         </div>
