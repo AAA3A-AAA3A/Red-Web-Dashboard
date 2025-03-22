@@ -18,7 +18,7 @@
                 {% include "pages/guild_profile.html" %}
             {% endif %}
 
-            <div id="guild-content"{% if guild and not fullscreen %} class="col-md-8 mt-4"{% endif %}>
+            <div id="guild-content"{% if guild and not expanded and not fullscreen %} class="col-md-8 mt-4"{% endif %}>
                 {% if guild and not fullscreen %}
                     <ul class="nav nav-pills position-relative end-0" role="tablist">
                         <li class="nav-item">
