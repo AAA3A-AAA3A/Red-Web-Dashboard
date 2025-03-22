@@ -13,7 +13,7 @@ from flask import Flask
 from .utils import check_for_disconnect, initialize_websocket, get_result
 
 
-class TasksManager:
+class TaskManager:
     def __init__(self, app: Flask) -> None:
         self.app: Flask = app
 
@@ -149,14 +149,14 @@ class TasksManager:
             self.threads.append(
                 threading.Thread(
                     target=asyncio.run,
-                    args=[self.update_data_variables("DASHBOARDRPC__GET_DATA")],
+                    args=[self.update_data_variables("DASHBOARDRPC__GET_DATA", once=False)],
                     daemon=True,
                 )
             )
             self.threads.append(
                 threading.Thread(
                     target=asyncio.run,
-                    args=[self.update_data_variables("DASHBOARDRPC__GET_VARIABLES")],
+                    args=[self.update_data_variables("DASHBOARDRPC__GET_VARIABLES", once=False)],
                     daemon=True,
                 )
             )
@@ -179,12 +179,12 @@ class TasksManager:
         else:
             self.threads.append(
                 self.app.cog.bot.loop.create_task(
-                    self.update_data_variables("DASHBOARDRPC__GET_DATA")
+                    self.update_data_variables("DASHBOARDRPC__GET_DATA", once=False)
                 )
             )
             self.threads.append(
                 self.app.cog.bot.loop.create_task(
-                    self.update_data_variables("DASHBOARDRPC__GET_VARIABLES")
+                    self.update_data_variables("DASHBOARDRPC__GET_VARIABLES", once=False)
                 )
             )
 

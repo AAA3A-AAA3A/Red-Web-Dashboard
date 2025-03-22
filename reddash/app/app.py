@@ -24,7 +24,7 @@ from markdown import Markdown
 from waitress import serve
 from werkzeug.serving import BaseWSGIServer, make_server
 
-from .tasks_manager import TasksManager
+from .task_manager import TaskManager
 from .utils import (
     add_constants,
     apply_themes,
@@ -82,7 +82,7 @@ class FlaskApp(Flask):
         self.lock: Lock = Lock()
         self.babel: Babel = Babel(self)
 
-        self.tasks_manager: TasksManager = TasksManager(self)
+        self.task_manager: TaskManager = TaskManager(self)
         self.data: typing.Dict[str, typing.Any] = {}
         self.variables: typing.Dict[str, typing.Any] = {}
         self.server_thread: ServerThread = None
@@ -123,11 +123,11 @@ class FlaskApp(Flask):
         self.config["RPC_CONNECTED"]: bool = False
         self.config["LAUNCH"]: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
         self.config["LAST_RPC_EVENT"]: datetime.datetime = self.config["LAUNCH"]
-        await self.tasks_manager.update_data_variables("DASHBOARDRPC__GET_DATA")
-        await self.tasks_manager.update_data_variables(
+        await self.task_manager.update_data_variables("DASHBOARDRPC__GET_DATA")
+        await self.task_manager.update_data_variables(
             "DASHBOARDRPC__GET_VARIABLES", only_bot_variables=True
         )
-        self.tasks_manager.start_tasks()
+        self.task_manager.start_tasks()
 
         # Initialize security.
         # Session encoding.
