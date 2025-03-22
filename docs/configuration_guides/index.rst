@@ -7,7 +7,7 @@
 Configuring Companion Cog
 =========================
 
-Due to advanced setups, the steps to set up Red-Dashboard for two bots opposed to one are more complex. Consider your needs then pick the guide to follow:
+Due to advanced setups, the steps to set up Red-Web-Dashboard for two bots opposed to one are more complex. Consider your needs then pick the guide to follow:
 
 .. toctree::
     :maxdepth: 1

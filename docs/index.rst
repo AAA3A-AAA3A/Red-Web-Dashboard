@@ -1,6 +1,6 @@
 .. _main:
 
-Welcome to Red-Dashboard's documentation!
+Welcome to Red-Web-Dashboard's documentation!
 =========================================
 
 .. important::

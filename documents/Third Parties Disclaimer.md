@@ -1,18 +1,18 @@
 # Third Parties Disclaimer
 
 ## Introduction
-Red-Dashboard is a website that provides a friendly interface to control and modify how your Red-DiscordBot behaves in a Discord (discord.com) server. This website allows for third party integrations for more control of such plugins and for easier use. This document will describe what may happen with Third Party Integrations.
-- "Creators," "we" or "us" refers to Repository Owners of the source code or any user that has contributed to the Red-Dashboard code.
+Red-Web-Dashboard is a website that provides a friendly interface to control and modify how your Red-DiscordBot behaves in a Discord (discord.com) server. This website allows for third party integrations for more control of such plugins and for easier use. This document will describe what may happen with Third Party Integrations.
+- "Creators," "we" or "us" refers to Repository Owners of the source code or any user that has contributed to the Red-Web-Dashboard code.
 - "You" refers to the person reading this Privacy Policy or accessing this website.
 - "Owner" or "bot owner" refers to any person(s) who has access to the website/service files or to the Red-DiscordBot program/service files.
 
-This Third Party document applies whenever you access this Red-Dashboard website/service or any other Red-Dashboard website/services. This document will detail to you:
+This Third Party document applies whenever you access this Red-Web-Dashboard website/service or any other Red-Web-Dashboard website/services. This document will detail to you:
 - How Third Parties integrations are structured.
 - What to do when malicious use is detected.
 
-If you do not wish to interact with Third Parties integrations, then do not use any components of the Red-Dashboard that are included with a disclaimer stating that they are a Third Parties Integration or disable them manually.
+If you do not wish to interact with Third Parties integrations, then do not use any components of the Red-Web-Dashboard that are included with a disclaimer stating that they are a Third Parties Integration or disable them manually.
 
-This Third Parties document applies to any unmodified distribution of the source code found here (https://github.com/AAA3A-AAA3A/Red-Dashboard). If this instance of Red-Dashboard is modified in any way from the code found in the above link, then this Third Parties document does not apply, and instead "creators," "we" or "us" refers to the same person(s) as "owner" or "bot owner" does.
+This Third Parties document applies to any unmodified distribution of the source code found here (https://github.com/AAA3A-AAA3A/Red-Web-Dashboard). If this instance of Red-Web-Dashboard is modified in any way from the code found in the above link, then this Third Parties document does not apply, and instead "creators," "we" or "us" refers to the same person(s) as "owner" or "bot owner" does.
 
 ## 1. How Third Parties integrations are structured
 When you navigate to a URL that includes `/third-party/` or using a widget that has a Third Parties integration disclaimer, you are using a part of Sashboard that connects with a connected cog that is not the supported Dashboard companion cog. Whatever data you input there or whatever actions you take there will be sent to the respective Third Party cog, NOT the Dashboard companion cog.
@@ -29,6 +29,6 @@ If you have any complaints, concerns or issues with this privacy policy, you sho
 It is possible that this Third Party integration document may be updated as situations change and to satisfy legal requirements. If this happens at any time, we will attempt to notify owners through a third-party app, Discord, 30 days before such changes to privacy policies are put into effect, so that the owner may communicate to users the changes that the Privacy Policy will be experiencing.
 
 ## 5. Contact Information
-If you have a question about this privacy policy, you may contact the Red-Dashboard creator through the following ways:
-- Github issue, on the Red-Dashboard Repository linked in the Introduction
+If you have a question about this privacy policy, you may contact the Red-Web-Dashboard creator through the following ways:
+- Github issue, on the Red-Web-Dashboard Repository linked in the Introduction
 - Discord contact (AAA3A ID: 829612600059887649)

@@ -1,6 +1,6 @@
 /*
  * Project: Utils
- * Description: Utils for Red-Dashboard.
+ * Description: Utils for Red-Web-Dashboard.
  * Author: AAA3A
  */
 

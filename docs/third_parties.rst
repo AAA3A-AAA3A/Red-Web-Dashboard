@@ -7,27 +7,27 @@
 Third Parties
 =============
 
-This guide details how to add third-party cogs to Red-Dashboard and create custom pages on the web Dashboard.
+This guide details how to add third-party cogs to Red-Web-Dashboard and create custom pages on the web Dashboard.
 
 ---------------
 Getting Started
 ---------------
 
-Red-Dashboard allows third-party integrations, enabling cog creators to add custom pages to the Dashboard. Users just need to install and load the cogs that offer this integration on their bot.
+Red-Web-Dashboard allows third-party integrations, enabling cog creators to add custom pages to the Dashboard. Users just need to install and load the cogs that offer this integration on their bot.
 
 A "Third Parties" page is present in the Dashboard's side menu, providing quick access to visible pages. Hidden pages can be accessed via links provided by the cog itself. Additionally, a "Third Parties" tab is available on each guild's page.
 
-⚠️ Third parties are not officially part of Red-Dashboard. Any information provided will be utilized by the third parties, not Red-Dashboard or the cog Dashboard. For more details, refer to the `Third Parties Disclaimer <https://github.com/Cog-Creators/Red-Dashboard/blob/master/documents/Third%20Parties%20Disclaimer.md>`.
+⚠️ Third parties are not officially part of Red-Web-Dashboard. Any information provided will be utilized by the third parties, not Red-Web-Dashboard or the cog Dashboard. For more details, refer to the `Third Parties Disclaimer <https://github.com/Cog-Creators/Red-Dashboard/blob/master/documents/Third%20Parties%20Disclaimer.md>`.
 
 How It Works
 ============
 
-If you are an end user, you can skip this section unless you want to understand how third parties function. If you are a cog creator who wants to integrate Red-Dashboard with your cogs, please continue reading.
+If you are an end user, you can skip this section unless you want to understand how third parties function. If you are a cog creator who wants to integrate Red-Web-Dashboard with your cogs, please continue reading.
 
-On the Red-Dashboard Side
+On the Red-Web-Dashboard Side
 =========================
 
-Red-Dashboard adds two endpoints: ``/third-party/<cog_name>/[page]?**[params]`` and ``/dashboard/<guild_id>/third-party/<cog_name>/[page]?**[params]``. The local Dashboard cog sends the list of third parties and pages to Red-Dashboard through the get_variables RPC method, which is called at regular intervals to ensure the cog and page exist.
+Red-Web-Dashboard adds two endpoints: ``/third-party/<cog_name>/[page]?**[params]`` and ``/dashboard/<guild_id>/third-party/<cog_name>/[page]?**[params]``. The local Dashboard cog sends the list of third parties and pages to Red-Web-Dashboard through the get_variables RPC method, which is called at regular intervals to ensure the cog and page exist.
 
 Depending on the parameters provided by the cog creator, the code will deny requests if the used method is not one of the allowed ones (``HEAD``, ``GET``, ``OPTIONS``, ``POST``, ``PATCH``, and ``DELETE``). If ``user_id`` is a required parameter, the Dashboard will request the OAuth login of the current user. If ``guild_id`` is required, the current ``dashboard.html`` page will be displayed to allow the choice of a guild.
 ``user_id``, ``guild_id``, ``member_id``, ``role_id``, and ``channel_id`` are context variables, which should be integers. Currently, choice is not possible for members, roles, and channels, but these parameters could be provided manually by cogs in Discord. If parameters are required, the Dashboard will display an error in the browser.
@@ -79,9 +79,9 @@ Here are the parameters for the ``dashboard.rpc.thirdparties.dashboard_page`` de
 
 - ``hidden`` (``bool``): Determines whether the page is hidden in the third parties list. Defaults to False, or True if there are required kwargs.
 
-The ``DashboardRPC_ThirdParties.data_receive`` RPC method receives the data from Red-Dashboard for the mentioned API endpoint. It checks the existence of the third party and the page. If the cog is no longer loaded, the request is refused with an error message. If a ``context_ids`` variable is provided (``user_id``, ``guild_id``, ``member_id``, ``role_id``, or ``channel_id``), the code checks if the bot has access to it and if the Discord objects actually exist. The parameters ``user``, ``guild``, ``member``, ``role``, and ``channel`` are then added.
+The ``DashboardRPC_ThirdParties.data_receive`` RPC method receives the data from Red-Web-Dashboard for the mentioned API endpoint. It checks the existence of the third party and the page. If the cog is no longer loaded, the request is refused with an error message. If a ``context_ids`` variable is provided (``user_id``, ``guild_id``, ``member_id``, ``role_id``, or ``channel_id``), the code checks if the bot has access to it and if the Discord objects actually exist. The parameters ``user``, ``guild``, ``member``, ``role``, and ``channel`` are then added.
 
-The arguments received from Red-Dashboard (and passed to cogs) are ``method`` (``Literal["HEAD", "GET", "OPTIONS", "POST", "PATCH", "DELETE"]``), ``request_url`` (``str``), ``csrf_token`` (``typing.Tuple[str, str]``), ``wtf_csrf_secret_key`` (``bytes``), ``**context_ids``, ``**required_kwargs``, ``**optional_kwargs``, ``extra_kwargs`` (``typing.Dict[str, typing.Any]``), ``data`` (``typing.Dict[typing.Literal["form", "json"], ImmutableMultiDict[str, typing.Union[typing.Any, typing.List[typing.Any]]]]``), and ``lang_code`` (`str`). Cogs should use ``**kwargs`` last, as the user (or Flask) is free to add any parameters they wish to the pages in the URL.
+The arguments received from Red-Web-Dashboard (and passed to cogs) are ``method`` (``Literal["HEAD", "GET", "OPTIONS", "POST", "PATCH", "DELETE"]``), ``request_url`` (``str``), ``csrf_token`` (``typing.Tuple[str, str]``), ``wtf_csrf_secret_key`` (``bytes``), ``**context_ids``, ``**required_kwargs``, ``**optional_kwargs``, ``extra_kwargs`` (``typing.Dict[str, typing.Any]``), ``data`` (``typing.Dict[typing.Literal["form", "json"], ImmutableMultiDict[str, typing.Union[typing.Any, typing.List[typing.Any]]]]``), and ``lang_code`` (`str`). Cogs should use ``**kwargs`` last, as the user (or Flask) is free to add any parameters they wish to the pages in the URL.
 
 -----------------
 What about forms?
@@ -99,7 +99,7 @@ The ``DpyObjectConverter`` validator, also passed as a keyword argument, is avai
 How to integrate third parties in your cogs?
 --------------------------------------------
 
-The cog Dashboard is capable of loading after third-party cogs when the bot is starting or simply reloaded. Upon loading, it dispatches the ``on_dashboard_cog_load```` event. This event is also manually triggered for a specific cog when that cog is loaded. This approach allows a cog to be added to Red-Dashboard under any circumstances, using a single method to add all its pages.
+The cog Dashboard is capable of loading after third-party cogs when the bot is starting or simply reloaded. Upon loading, it dispatches the ``on_dashboard_cog_load```` event. This event is also manually triggered for a specific cog when that cog is loaded. This approach allows a cog to be added to Red-Web-Dashboard under any circumstances, using a single method to add all its pages.
 
 To avoid the need for the ``commands.Cog.cog_unload```` method, the cog Dashboard employs the ``on_cog_remove event``. This event automatically removes the third party upon unloading.
 
@@ -157,7 +157,7 @@ In ``dashboard_integration.py``:
             dashboard_cog.rpc.third_parties_handler.add_third_party(self)  # Add the third party to Dashboard.
 
         @dashboard_page(name=None, description="Send **Hello** to a user!", methods=("GET", "POST"), is_owner=True)  # Create a default page for the third party (``name=None``). It will be available at the URL ``/third-party/MyCog``.
-        async def send_hello(self, user: discord.User, **kwargs) -> typing.Dict[str, typing.Any]:  # The kwarg ``user`` means that Red-Dashboard will request a connection from a bot user with OAuth from Discord.
+        async def send_hello(self, user: discord.User, **kwargs) -> typing.Dict[str, typing.Any]:  # The kwarg ``user`` means that Red-Web-Dashboard will request a connection from a bot user with OAuth from Discord.
             import wtforms
             class Form(kwargs["Form"]):  # Create a WTForms form.
                 def __init__(self):
@@ -190,7 +190,7 @@ In ``dashboard_integration.py``:
             }
 
         @dashboard_page(name="guild", description="Get basic details about a __guild__!")  # Create a page nammed "guild" for the third party. It will be available at the URL ``/dashboard/<guild_id>/third-party/MyCog/guild``.
-        async def guild_page(self, user: discord.User, guild: discord.Guild, **kwargs) -> typing.Dict[str, typing.Any]:  # The kwarg ``guild`` means that Red-Dashboard will ask for the choice of a guild among those to which the user has access.
+        async def guild_page(self, user: discord.User, guild: discord.Guild, **kwargs) -> typing.Dict[str, typing.Any]:  # The kwarg ``guild`` means that Red-Web-Dashboard will ask for the choice of a guild among those to which the user has access.
             return {
                 "status": 0,
                 "web_content": {  # Return a web content with the text variable ``title_content``.
@@ -202,4 +202,4 @@ Closing Words and Further Reading
 ---------------------------------
 
 If you're reading this, it means that you've made it to the end of this guide.
-Congratulations! You are now prepared with the Third Parties integrations for Red-Dashboard.
+Congratulations! You are now prepared with the Third Parties integrations for Red-Web-Dashboard.

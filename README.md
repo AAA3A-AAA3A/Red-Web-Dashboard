@@ -1,4 +1,4 @@
-# Red-Dashboard (Fork of Neuro's Dashboard)
+# Red-Web-Dashboard (Fork of Neuro's Dashboard)
 An easy-to-use interactive web Dashboard to control your Red-DiscordBot instance! Thank you very much to Neuro for the initial work!
 
 ## Overview
@@ -13,12 +13,12 @@ This project is supported on Windows, Mac OS X and Linux distributions, however 
 If you wish to use this program and receive support for it, you must also give feedback and report any bugs you encounter. You can ask in the #support_aaa3a-cogs channel in the [cogs support server](https://discord.gg/GET4DVk).
 
 ## Legal
-Red-Dashboard for Red-DiscordBot is released under [Affero General Public License v3](https://github.com/AAA3A-AAA3A/Red-Dashboard/blob/main/LICENSE).
+Red-Web-Dashboard for Red-DiscordBot is released under [Affero General Public License v3](https://github.com/AAA3A-AAA3A/Red-Web-Dashboard/blob/main/LICENSE).
 
 For details about how this project manages your privacy, please review the following documents. By using this program, you acknowledge that you have read these documents and consent to having your data used in the ways described in such documents.
-- [Cookie Policy](https://github.com/AAA3A-AAA3A/Red-Dashboard/blob/main/documents/Cookie%20Policy.md)
-- [Privacy Policy](https://github.com/AAA3A-AAA3A/Red-Dashboard/blob/main/documents/Privacy%20Policy.md)
-- [Third Parties Disclaimer](https://github.com/AAA3A-AAA3A/Red-Dashboard/blob/main/documents/Third%20Parties%20Disclaimer.md)
+- [Cookie Policy](https://github.com/AAA3A-AAA3A/Red-Web-Dashboard/blob/main/documents/Cookie%20Policy.md)
+- [Privacy Policy](https://github.com/AAA3A-AAA3A/Red-Web-Dashboard/blob/main/documents/Privacy%20Policy.md)
+- [Third Parties Disclaimer](https://github.com/AAA3A-AAA3A/Red-Web-Dashboard/blob/main/documents/Third%20Parties%20Disclaimer.md)
 
 ## Credits
 I would like to thank the following, for all the contributions they have made that helped this become what it is today.

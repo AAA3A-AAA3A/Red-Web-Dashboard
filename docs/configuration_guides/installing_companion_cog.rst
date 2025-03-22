@@ -36,7 +36,7 @@ Installing the cog is extremely easy, and can be accomplished through Red's cogs
 
 .. danger::
 
-    The ``dashboard`` cog located `here <https://github.com/AAA3A-AAA3A/AAA3A-cogs>`__ is the only official companion cog to the Red-Dashboard software. Take precaution before installing cogs that you may not trust.
+    The ``dashboard`` cog located `here <https://github.com/AAA3A-AAA3A/AAA3A-cogs>`__ is the only official companion cog to the Red-Web-Dashboard software. Take precaution before installing cogs that you may not trust.
 
 3. Next, install the ``dashboard`` cog from the repository:
 

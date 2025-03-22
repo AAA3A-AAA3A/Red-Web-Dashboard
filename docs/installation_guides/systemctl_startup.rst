@@ -46,7 +46,7 @@ Replace ``path`` with your python path and ``username`` with your Linux username
 .. code-block:: none
 
     [Unit]
-    Description=Red-Dashboard
+    Description=Red-Web-Dashboard
     After=multi-user.target
     After=network-online.target
     Wants=network-online.target

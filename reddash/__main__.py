@@ -66,8 +66,8 @@ async def _main():
     progress_bar = progress.Progress(
         "{task.description}", progress.TextColumn("{task.fields[status]}\n")
     )
-    progress_bar.print(rule.Rule("Red-Dashboard - Webserver"))
-    disclaimer = "This is an instance of Red-DiscordBot's Dashboard, created initially by Neuro Assassin (https://github.com/NeuroAssassin) then forked by AAA3A (https://github.com/AAA3A-AAA3A). This package isn't endorsed by the Org at all.\n\nThis package is protected under the AGPL License. Any action that will break this license (including but not limited to, removal of credits) may result in a DMCA takedown request, or other legal consequences.\nYou can view the license at https://github.com/AAA3A-AAA3A/Red-Dashboard/blob/main/LICENSE."
+    progress_bar.print(rule.Rule("Red-Web-Dashboard - Webserver"))
+    disclaimer = "This is an instance of Red-DiscordBot's Dashboard, created initially by Neuro Assassin (https://github.com/NeuroAssassin) then forked by AAA3A (https://github.com/AAA3A-AAA3A). This package isn't endorsed by the Org at all.\n\nThis package is protected under the AGPL License. Any action that will break this license (including but not limited to, removal of credits) may result in a DMCA takedown request, or other legal consequences.\nYou can view the license at https://github.com/AAA3A-AAA3A/Red-Web-Dashboard/blob/main/LICENSE."
     # vartask = progress_bar.add_task("Update variable task:", status="[bold blue]Starting[/bold blue]")
     # cmdtask = progress_bar.add_task("Update command task:", status="[bold blue]Starting[/bold blue]")
     # vertask = progress_bar.add_task("Update version task:", status="[bold blue]Starting[/bold blue]")

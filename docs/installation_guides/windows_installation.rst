@@ -13,7 +13,7 @@ Windows Installation
 
    For safety reasons, no commands in this guide should be run in a Command Prompt or Powershell session with Administrator privileges. No installation commands require access to protected folders.
 
-Welcome to the Windows Installation Guide for the Red-Dashboard Webserver. While running the below directions, the following is assumed:
+Welcome to the Windows Installation Guide for the Red-Web-Dashboard Webserver. While running the below directions, the following is assumed:
 -  You are on a Windows distribution.
 -  You have all pre-requisites of Red-DiscordBot installed.
 -  You have an instance of Red-DiscordBot, set up and initialized.
@@ -26,7 +26,7 @@ This guide recommends using the same requisites that Red-DiscordBot uses. To ens
 Creating a virtual environment
 ------------------------------
 
-Just like for Red-DiscordBot, Red-Dashboard requires it’s own, separate virtual environment to isolate dependencies. Red Dashboard also requires a Python version minimum of 3.8.1, and it is recommended to use the same Python version as you use for Red-Discord Bot.
+Just like for Red-DiscordBot, Red-Web-Dashboard requires it’s own, separate virtual environment to isolate dependencies. Red Dashboard also requires a Python version minimum of 3.8.1, and it is recommended to use the same Python version as you use for Red-Discord Bot.
 
 First, create a virtual environment using whatever Python version you use for red. For example, if Python 3.11 was installed and being used for Red:
 
@@ -42,7 +42,7 @@ Next, enter your virtual environment with this command:
 
 .. important::
 
-   You must activate the virtual environment with the above command every time you open a new shell to run, install or update Red-Dashboard.
+   You must activate the virtual environment with the above command every time you open a new shell to run, install or update Red-Web-Dashboard.
 
 Installing Red Dashboard
 ------------------------

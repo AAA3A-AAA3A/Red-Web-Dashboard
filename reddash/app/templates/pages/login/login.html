@@ -27,7 +27,7 @@
                             <h1 class="text-center mt-2 mb-3">{{ _("Authentication") }}</h1>
                           </div>
                           <div class="card-body px-lg-5 pt-0">
-                            <p class="text-center">{{ _("Accessing Red-Dashboard controls requires authorization for security. Authorization for Red-Dashboard uses Discord Open Authentication to identify and verify users. Please click on the Login button below to access the Dashboard.") }}</p>
+                            <p class="text-center">{{ _("Accessing Red-Web-Dashboard controls requires authorization for security. Authorization for Red-Web-Dashboard uses Discord Open Authentication to identify and verify users. Please click on the Login button below to access the Dashboard.") }}</p>
                             <br />
                             <a class="btn bg-gradient-{{ variables["meta"]["color"] }} mb-1 w-100" href="{{ url_for("login_blueprint.discord_oauth", next=next) }}">{{ _("Login with Discord") }}</a>
                           </div>

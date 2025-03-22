@@ -37,7 +37,7 @@ async def login():
     if app.data["core"]["secret"] is None:
         flash(
             _(
-                "Authorization is unavailable for Red-Dashboard until setting a secret Discord oauth key. If you believe this message is delivered in error, please contact the developer for assistance."
+                "Authorization is unavailable for Red-Web-Dashboard until setting a secret Discord oauth key. If you believe this message is delivered in error, please contact the developer for assistance."
             ),
             category="danger",
         )
