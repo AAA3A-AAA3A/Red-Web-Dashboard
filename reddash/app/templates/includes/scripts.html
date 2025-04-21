@@ -37,7 +37,7 @@
         "onclick": null,
         "showDuration": "300",
         "hideDuration": "1000",
-        "timeOut": "5000",
+        "timeOut": "8000",
         "extendedTimeOut": "1000",
         "showEasing": "swing",
         "hideEasing": "linear",
@@ -48,7 +48,7 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                toastr.{{ category }}("{{ message|replace('\n', ' ') }}");
+                toastr.{{ category }}("{{ message|replace('\n', ' ')|markdown|replace('<p>', '')|replace('</p>', '') }}");
             {% endfor %}
         {% endif %}
     {% endwith %}
@@ -117,12 +117,12 @@
     const SwalAlert = Swal.mixin({
         icon: "warning",
         customClass: {
-            confirmButton: "btn bg-danger",
-            cancelButton: "btn bg-success",
+            confirmButton: "btn bg-success",
+            cancelButton: "btn bg-danger",
         },
         buttonsStyling: true,
         showCancelButton: true,
-        cancelButtonText: "Annuler",
+        cancelButtonText: '{{ _("Cancel") }}',
         reverseButtons: true,
     });
 </script>

@@ -42,8 +42,7 @@ async def webhook_route():
             "method": "DASHBOARDRPC_WEBHOOKS__WEBHOOK_RECEIVE",
             "params": [payload],
         }
-        with app.lock:
-            return await get_result(app, requeststr)
+        return await get_result(app, requeststr)
     except Exception as e:
         app.logger.error("Error sending webhook data.", exc_info=e)
 
@@ -61,8 +60,7 @@ async def oauth_route(provider: str):
         "method": "DASHBOARDRPC_THIRDPARTIES__OAUTH_RECEIVE",
         "params": [current_user.id, args],
     }
-    with app.lock:
-        await get_result(app, requeststr)
+    await get_result(app, requeststr)
     return render_template("pages/third_parties/oauth.html", provider=provider)
 
 
@@ -236,8 +234,7 @@ async def third_party(name: str, page: str = None, guild_id: str = None):
                 app.extensions["babel"].locale_selector(),
             ],
         }
-        with app.lock:
-            result = await get_result(app, requeststr)
+        result = await get_result(app, requeststr)
 
         if "data" in result:
             return result["data"]

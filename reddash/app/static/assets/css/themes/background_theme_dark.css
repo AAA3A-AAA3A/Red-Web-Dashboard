@@ -75,10 +75,14 @@ h1, h2, h3, h4, h5, h6, h1 *, h2 *, h3 *:not(.dropdown-item,.dropdown-item *), h
 hr {
     border-color: white !important;
 }
-, h4 *, h5 *, h6 * {
+h3 *, h4 *, h5 *, h6 * {
     color: white !important;
 }
 
 hr {
     border-color: white !important;
+}
+
+h2.swal2-title, h2.swal2-title * {
+    color: black !important;
 }

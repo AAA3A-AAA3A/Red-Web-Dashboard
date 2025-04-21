@@ -394,7 +394,7 @@ def add_constants(app: Flask) -> None:
                 continue
             # I have to localize here opposed to storing it because... well... then it's not localized.
             if item["name"] == "builtin-home":
-                item["name"] = _("Home page")
+                item["name"] = _("Home")
             elif item["name"] == "builtin-commands":
                 item["name"] = _("Commands")
             elif item["name"] == "builtin-dashboard":
@@ -409,6 +409,8 @@ def add_constants(app: Flask) -> None:
                 item["name"] = _("Logout")
             elif item["name"] == "builtin-admin":
                 item["name"] = _("Admin")
+            elif item["name"] == "builtin-cog-management":
+                item["name"] = _("Cog Management")
             # if not item["is_http"]:
             try:
                 item["url"] = url_for(item["route"])
@@ -621,19 +623,21 @@ def initialize_babel(app: Flask) -> None:
 
 
 def initialize_websocket(app: Flask) -> bool:
-    app.ws: websocket.WebSocket = websocket.WebSocket()
-    try:
-        app.ws.connect(f"ws://{app.config['WEBSOCKET_HOST']}:{app.config['WEBSOCKET_PORT']}")
-    except WS_EXCEPTIONS:
-        app.ws.close()
-        app.ws = None
-        return False
+    with app.lock:
+        app.ws: websocket.WebSocket = websocket.WebSocket()
+        try:
+            app.ws.connect(f"ws://{app.config['WEBSOCKET_HOST']}:{app.config['WEBSOCKET_PORT']}")
+        except WS_EXCEPTIONS:
+            app.ws.close()
+            app.ws = None
+            return False
     return True
 
 
-def check_for_disconnect(app: Flask, method: str, result: typing.Dict[str, typing.Any]) -> bool:
+def check_for_disconnect(app: Flask, result: typing.Dict[str, typing.Any]) -> bool:
     if (
         "error" in result
+        and isinstance(result["error"], typing.Dict)
         and result["error"]["message"] == "Method not found"
         or result.get("disconnected", False)
     ):
@@ -658,8 +662,9 @@ async def get_result(app: Flask, request: typing.Dict[str, typing.Any], *, retry
             msg=JsonRpcMsg(type=JsonRpcMsgTyp.REQUEST, data=request),
         )
     try:
-        app.ws.send(json.dumps(request))
-        result = json.loads(app.ws.recv())
+        with app.lock:
+            app.ws.send(json.dumps(request))
+            result = json.loads(app.ws.recv())
     except WS_EXCEPTIONS:
         if not retry:
             return {"status": 1, "error": _("Not connected to bot.")}

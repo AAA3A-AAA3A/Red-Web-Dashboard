@@ -1,0 +1,151 @@
+<div class="row">
+    <div class="col-sm-12 text-left">
+        <div class="d-flex justify-content-between mb-2">
+            <h2 class="card-title">{{ _("Downloader") }} ({{ repos_number }} {% if repos_number != 1 %}{{ _("repositories") }}{% else %}{{ _("repository") }}{% endif %})</h2>
+            <form action="" method="POST" role="form" enctype="multipart/form-data">
+                {{ update_repos_cogs_form.hidden_tag() }}
+                {{ update_repos_cogs_form.update_repos(class="btn mb-0 bg-gradient-primary") }}
+                {{ update_repos_cogs_form.update_cogs(class="btn mb-0 bg-gradient-primary") }}
+            </form>
+        </div>
+    </div>
+</div>
+<br />
+
+<form action="" method="POST" role="form" enctype="multipart/form-data">
+    {{ add_repo_form.hidden_tag() }}
+    <div class="d-flex align-items-center">
+        <div class="me-2">
+            {{ add_repo_form.name(class="form-control", placeholder=_("Name")) }}
+        </div>
+        <div class="me-2 flex-grow-1">
+            {{ add_repo_form.repo_url(class="form-control", placeholder="https://github.com/AAA3A-AAA3A/AAA3A-cogs") }}
+        </div>
+        <div class="me-2">
+            {{ add_repo_form.branch(class="form-control", placeholder=_("Branch")) }}
+        </div>
+        <div>
+            {{ add_repo_form.submit(class="btn mb-0 bg-gradient-" + variables["meta"]["color"] + " btn-md") }}
+        </div>
+    </div>
+</form>
+<br />
+
+<div class="row">
+    <div id="repos-tabs" class="nav-wrapper position-relative col-md-2">
+        <ul class="nav nav-pills nav-fill flex-column p-1" role="tablist" aria-orientation="vertical">
+            {% for repo in repos %}
+                <li class="nav-item">
+                    <a class="nav-link mb-0 px-0 py-1 {% if loop.index == 1 %}active{% endif %}" id="{{ repo.name }}-tab" href="#{{ repo.name }}" role="tab" data-toggle="pill" aria-controls="{% if loop.index == 1 %}preview{% else %}code{% endif %}" aria-selected="{% if loop.index == 1 %}false{% else %}false{% endif %}">{{ repo.name }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="col-md-10">
+        <span id="topOfTabContent"></span>
+        <div class="tab-content" id="myTabContent">
+            {% for repo in repos %}
+                <div class="tab-pane fade {% if (not tab_name and loop.index == 1) or (tab_name and repo.name == tab_name) %}show active{% endif %}" id="{{ repo.name }}" role="tabpanel" aria-labelledby="{{ repo.name }}-tab">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-sm-12">
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <h3 class="card-title">{{ repo.name }}</h3>
+                                                <form action="" method="POST" role="form" enctype="multipart/form-data">
+                                                    {{ repos_actions_forms[repo.name].hidden_tag() }}
+                                                    {{ repos_actions_forms[repo.name].update_repo(style="display: none;") }}
+                                                    {{ repos_actions_forms[repo.name].update_cogs_from_repo(style="display: none;") }}
+                                                    <div class="btn-group" style="display: unset;">
+                                                        <a class="nav-link text-primary" role="button" id="repo_{{ repo.name }}_dropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="display: unset;">
+                                                            <i class="fa fa-cloud-download" style="font-size: 30px;"></i>
+                                                        </a>
+                                                        <ul class="dropdown-menu dropdown-menu-right" aria-labelledby="repo_{{ repo.name }}_dropdown">
+                                                            <li class="nav-link"><a class="nav-item dropdown-item" onclick='this.parentElement.parentElement.querySelector("#{{ repos_actions_forms[repo.name].update_repo.id }}").click();'><i class="fa fa-download" style="width: 1em; vertical-align: -1.5px;"></i> {{ repos_actions_forms[repo.name].update_repo.label }}</a></li>
+                                                            <li class="nav-link"><a class="nav-item dropdown-item" onclick='this.parentElement.parentElement.querySelector("#{{ repos_actions_forms[repo.name].update_cogs_from_repo.id }}").click();'><i class="fa fa-cogs" style="width: 1em; vertical-align: -0.5px;"></i> {{ repos_actions_forms[repo.name].update_cogs_from_repo.label }}</a></li>
+                                                        </ul>
+                                                    </div>
+                                                    {{ repos_actions_forms[repo.name].remove(onclick='return confirmRemoveRepo(event, "' + repo.name + '");', style="display: none;") }}
+                                                    <a class="text-danger" href="javascript:void(0);" onclick='this.parentElement.querySelector("#{{ repos_actions_forms[repo.name].remove.id }}").click();'><i class="fa fa-trash-o" style="font-size: 30px;"></i></a>
+                                                </form>
+                                            </div>
+                                            <p>{{ repo.description|markdown }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-ms-8">
+                                            <p class="mb-0"><b>{{ _("Author(s):") }}</b> {{ repo.author }}</p>
+                                            <p><b>{{ _("Repo:") }}</b> <a href="{{ repo.url }}">{{ repo.url }}</a></p>
+                                        </div>
+                                    </div>
+                                    <table class="table tablesorter">
+                                        <thead class="text-primary">
+                                            <tr>
+                                                <th>{{ _("Cog") }}</th>
+                                                <th>{{ _("Short Description") }}</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for available_cog in repo.available_cogs %}
+                                                <tr data-toggle="collapse" href="#collapse_{{ available_cog }}" role="button" aria-expanded="false" aria-controls="collapse_{{ available_cog }}">
+                                                    <td class="text-{{ variables["meta"]["color"] }}">
+                                                        {% if repo.available_cogs[available_cog].installed %}✅ {% endif %}{% if repo.available_cogs[available_cog].hidden %}<b>{{ _("HIDDEN") }}</b> {% endif %}{{ available_cog }}
+                                                    </td>
+                                                    <td style="padding-left: 24px" class="text-wrap">{{ (repo.available_cogs[available_cog].short_description or "")|markdown }}</td>
+                                                    <td>
+                                                        <form action="" method="POST" role="form" enctype="multipart/form-data">
+                                                            {{ cogs_actions_forms[repo.name][available_cog].hidden_tag() }}
+                                                            {% if not repo.available_cogs[available_cog].installed %}
+                                                                {{ cogs_actions_forms[repo.name][available_cog].install(onclick='return confirmInstallCog(event, "' + repo.name + '", "' + available_cog + '");', style="display: none;") }}
+                                                                <a class="text-success" href="javascript:void(0);" onclick='this.parentElement.querySelector("#{{ cogs_actions_forms[repo.name][available_cog].install.id }}").click();'><i class="fa fa-download" style="font-size: 20px;"></i></a>
+                                                            {% else %}
+                                                                {{ cogs_actions_forms[repo.name][available_cog].update(style="display: none;") }}
+                                                                <a class="text-primary" href="javascript:void(0);" onclick='this.parentElement.querySelector("#{{ cogs_actions_forms[repo.name][available_cog].update.id }}").click();'><i class="fa fa-cloud-download" style="font-size: 20px;"></i></a>
+                                                                {{ cogs_actions_forms[repo.name][available_cog].pin_or_unpin(style="display: none;") }}
+                                                                <a class="text-warning" href="javascript:void(0);" onclick='this.parentElement.querySelector("#{{ cogs_actions_forms[repo.name][available_cog].pin_or_unpin.id }}").click();'><i class="fa fa-{% if not available_cog.pinnged %}thumb-tack{% else %}times-circle{% endif %}" style="font-size: 20px;"></i></a>
+                                                                {{ cogs_actions_forms[repo.name][available_cog].uninstall(onclick='return confirmUninstallCog(event, "' + repo.name + '", "' + available_cog + '");', style="display: none;") }}
+                                                                <a class="text-danger" href="javascript:void(0);" onclick='this.parentElement.querySelector("#{{ cogs_actions_forms[repo.name][available_cog].uninstall.id }}").click();'><i class="fa fa-trash-o" style="font-size: 20px;"></i></a>
+                                                            {% endif %}
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                                {% if True and (repo.available_cogs[available_cog].description or repo.available_cogs[available_cog].author or repo.available_cogs[available_cog].tags or repo.available_cogs[available_cog].requirements or repo.available_cogs[available_cog].end_user_data_statement) %}
+                                                    <tr>
+                                                        <td colspan="2" style="border: none; padding: 0px;">
+                                                            <div class="collapse" id="collapse_{{ available_cog }}">
+                                                                <div class="d-flex card card-body text-wrap">
+                                                                    {% if repo.available_cogs[available_cog].description %}
+                                                                        {{ repo.available_cogs[available_cog].description|markdown }}
+                                                                    {% endif %}
+                                                                    {% if repo.available_cogs[available_cog].author %}
+                                                                        <strong>{{ _("Author(s):") }}</strong> {{ repo.available_cogs[available_cog].author|markdown }}
+                                                                    {% endif %}
+                                                                    {% if repo.available_cogs[available_cog].tags %}
+                                                                        <strong>{{ _("Tags:") }}</strong> {{ repo.available_cogs[available_cog].tags|markdown }}
+                                                                    {% endif %}
+                                                                    {% if repo.available_cogs[available_cog].requirements %}
+                                                                        <strong>{{ _("Requirements:") }}</strong> {{ repo.available_cogs[available_cog].requirements|markdown }}
+                                                                    {% endif %}
+                                                                    {% if repo.available_cogs[available_cog].end_user_data_statement %}
+                                                                        <strong>{{ _("End User Data Statement:") }}</strong> {{ repo.available_cogs[available_cog].end_user_data_statement|markdown }}
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>

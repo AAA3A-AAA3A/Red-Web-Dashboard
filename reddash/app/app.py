@@ -66,7 +66,7 @@ class FlaskApp(Flask):
         host: str = "0.0.0.0",
         port: int = 42356,
         rpc_port: int = 6133,
-        interval: int = 5,
+        interval: int = 15,
         dev: bool = False,
     ) -> None:  # debug: bool = False,
         super().__init__(import_name=__name__, static_folder="static", template_folder="templates")
@@ -108,7 +108,6 @@ class FlaskApp(Flask):
     async def create_app(self) -> None:
         # Initialize websocket variables.
         self.ws = None
-        self.lock: Lock = Lock()
 
         # Initialize core variables.
         self.running: bool = True

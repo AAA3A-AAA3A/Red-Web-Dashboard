@@ -45,7 +45,7 @@ parser: argparse.ArgumentParser = argparse.ArgumentParser()
 parser.add_argument("--host", dest="host", type=str, default="0.0.0.0")
 parser.add_argument("--port", dest="port", type=int, default=42356)
 parser.add_argument("--rpc-port", dest="rpc_port", type=int, default=6133)
-parser.add_argument("--interval", dest="interval", type=int, default=5, help=argparse.SUPPRESS)
+parser.add_argument("--interval", dest="interval", type=int, default=15, help=argparse.SUPPRESS)
 parser.add_argument("--development", dest="dev", action="store_true", help=argparse.SUPPRESS)
 # parser.add_argument("--debug", dest="debug", action="store_true")
 

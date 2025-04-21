@@ -1,3 +1,5 @@
+from gettext import install
+from turtle import update
 import typing  # isort:skip
 
 import base64
@@ -192,8 +194,7 @@ async def dashboard():
             request.args.get("filter"),
         ],
     }
-    with app.lock:
-        result = await get_result(app, requeststr)
+    result = await get_result(app, requeststr)
 
     guilds = Pagination(result.pop("items"), **result)
 
@@ -227,8 +228,7 @@ async def get_guild(guild_id: int, for_third_parties: bool = False):
         "method": "DASHBOARDRPC__GET_GUILD",
         "params": [current_user.id, guild_id, for_third_parties],
     }
-    with app.lock:
-        guild = await get_result(app, requeststr)
+    guild = await get_result(app, requeststr)
     if guild["status"] == 1:
         return abort(404, description=_("Guild not found or missing access to it."))
     guild["created_at"] = datetime.datetime.fromtimestamp(
@@ -886,7 +886,11 @@ async def admin(
             else:
                 flash(_("Dashboard unlocked."), category="success")
         elif dashboard_actions_form.refresh_sessions.data:
-            User.USERS.clear()
+            User.USERS = {
+                user_id: user
+                for user_id, user in User.USERS.items()
+                if not user.is_owner
+            }
             flash(_("Users sessions refreshed."), category="success")
         return redirect(request.url)
     elif dashboard_actions_form.lock.data and dashboard_actions_form.errors:
@@ -899,8 +903,7 @@ async def admin(
         "method": "DASHBOARDRPC__GET_DASHBOARD_SETTINGS",
         "params": [current_user.id],
     }
-    with app.lock:
-        dashboard_settings = await get_result(app, requeststr)
+    dashboard_settings = await get_result(app, requeststr)
     dashboard_settings_form: DashboardSettingsForm = DashboardSettingsForm(
         settings=dashboard_settings
     )
@@ -945,8 +948,7 @@ async def admin(
         "method": "DASHBOARDRPC__GET_BOT_SETTINGS",
         "params": [current_user.id],
     }
-    with app.lock:
-        bot_settings = await get_result(app, requeststr)
+    bot_settings = await get_result(app, requeststr)
     bot_settings_form: BotSettingsForm = BotSettingsForm(settings=bot_settings)
     if bot_settings_form.validate_on_submit():
         requeststr = {
@@ -1014,6 +1016,10 @@ async def admin(
         return redirect(request.url)
     elif custom_pages_form.submit.data and custom_pages_form.errors:
         for field_name, error_messages in custom_pages_form.errors.items():
+            if isinstance(error_messages[0], typing.Dict):
+                for sub_field_name, sub_error_messages in error_messages[0].items():
+                    flash(f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}", category="warning")
+                continue
             flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
     return render_template(
@@ -1029,6 +1035,451 @@ async def admin(
         bot_settings_form=bot_settings_form,
         custom_pages_form=custom_pages_form,
     )
+
+
+class CogForm(FlaskForm):
+    cog_name: wtforms.HiddenField = wtforms.HiddenField(_("Name"))
+    loaded: wtforms.BooleanField = wtforms.BooleanField(_("Loaded"))
+
+
+class CogsForm(FlaskForm):
+    def __init__(self, cogs: typing.Dict[str, bool]) -> None:
+        super().__init__(prefix="cogs_form_")
+        for cog_name, loaded in cogs.items():
+            self.cogs.append_entry({"cog_name": cog_name, "loaded": loaded})
+        self.cogs.default = [entry for entry in self.cogs.entries if entry.csrf_token.data is None]
+        self.cogs.entries = [entry for entry in self.cogs.entries if entry.csrf_token.data is not None]
+
+    cogs: wtforms.FieldList = wtforms.FieldList(
+        wtforms.FormField(CogForm),
+    )
+    submit: wtforms.SubmitField = wtforms.SubmitField(_("Save Modifications"))
+
+
+class UpdateReposCogsForm(FlaskForm):
+    def __init__(self) -> None:
+        super().__init__(prefix="update_repos_cogs_form_")
+
+    update_repos: wtforms.SubmitField = wtforms.SubmitField(_("Update Repositories"))
+    update_cogs: wtforms.SubmitField = wtforms.SubmitField(_("Update Cogs"))
+
+
+class AddRepoForm(FlaskForm):
+    def __init__(self) -> None:
+        super().__init__(prefix="add_repo_form_")
+
+    name: wtforms.StringField = wtforms.StringField(
+        _("Repository Name"),
+        validators=[
+            wtforms.validators.Length(max=20),
+            wtforms.validators.Regexp(
+                r"^[a-zA-Z0-9_\-\.]+$",
+                message=_(
+                    "Repo names can only contain characters A-z, numbers, underscores, hyphens, and dots."
+                ),
+            ),
+            wtforms.validators.Regexp(
+                r"^(?!\.)(?!.*\.$).+",
+                message=_("Repo names cannot start or end with a dot."),
+            ),
+        ],
+    )
+    repo_url: wtforms.URLField = wtforms.URLField(
+        _("Repository URL"),
+        validators=[
+            wtforms.validators.URL(),
+            wtforms.validators.Length(max=300),
+        ],
+    )
+    branch: wtforms.StringField = wtforms.StringField(
+        _("Branch"),
+        validators=[
+            wtforms.validators.Optional(),
+            wtforms.validators.Length(max=15),
+        ],
+    )
+    submit: wtforms.SubmitField = wtforms.SubmitField(_("Add Repository"))
+
+
+class RepoActionsForm(FlaskForm):
+    def __init__(self, repo: typing.Dict[str, str]) -> None:
+        super().__init__(prefix=f"repo_actions_form_{repo['name']}_")
+
+    update_repo: wtforms.SubmitField = wtforms.SubmitField(_("Update Repository"))
+    update_cogs_from_repo: wtforms.SubmitField = wtforms.SubmitField(_("Update Cogs from Repository"))
+    remove: wtforms.SubmitField = wtforms.SubmitField(_("Remove Repository"))
+
+
+class CogActionsForm(FlaskForm):
+    def __init__(self, cog_name: str) -> None:
+        super().__init__(prefix=f"cog_actions_form_{cog_name}_")
+
+    install: wtforms.SubmitField = wtforms.SubmitField(_("Install"))
+    update: wtforms.SubmitField = wtforms.SubmitField(_("Update"))
+    pin_or_unpin: wtforms.SubmitField = wtforms.SubmitField(_("Pin/Unpin"))
+    uninstall: wtforms.SubmitField = wtforms.SubmitField(_("Uninstall"))
+
+
+class SyncApplicationCommandsForm(FlaskForm):
+    def __init__(self) -> None:
+        super().__init__(prefix="sync_application_commands_form_")
+
+    submit: wtforms.SubmitField = wtforms.SubmitField(_("Sync Application Commands"))
+
+
+class ApplicationCommandForm(FlaskForm):
+    module: wtforms.HiddenField = wtforms.HiddenField(_("Module"))
+    ac_type: wtforms.HiddenField = wtforms.HiddenField(_("Type"))
+    ac_name: wtforms.HiddenField = wtforms.HiddenField(_("Name"))
+    enabled: wtforms.BooleanField = wtforms.BooleanField(_("Enabled"))
+
+
+class ApplicationCommandsForm(FlaskForm):
+    def __init__(self, application_commands: typing.Dict[str, typing.Any]) -> None:
+        super().__init__(prefix="application_commands_form_")
+        for module, commands in application_commands.items():
+            for command in commands:
+                self.application_commands.append_entry(
+                    {
+                        "module": module,
+                        "ac_type": command["type"],
+                        "ac_name": command["name"],
+                        "enabled": command["enabled"],
+                    }
+                )
+        self.application_commands.default = [entry for entry in self.application_commands.entries if entry.csrf_token.data is None]
+        self.application_commands.entries = [entry for entry in self.application_commands.entries if entry.csrf_token.data is not None]
+
+    application_commands: wtforms.FieldList = wtforms.FieldList(
+        wtforms.FormField(ApplicationCommandForm),
+    )
+    submit: wtforms.SubmitField = wtforms.SubmitField(_("Save Modifications"))
+
+
+@blueprint.route("/cog-management-downloader")
+async def cog_management_downloader():
+    if not current_user.is_authenticated or not current_user.is_owner:
+        return abort(403, description=_("You're not a bot owner!"))
+    requeststr = {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "DASHBOARDRPC_COGMANAGEMENT__GET_REPOS",
+        "params": [current_user.id],
+    }
+    result = await get_result(app, requeststr)
+    downloader_loaded = result["status"] == 0
+    repos = (result)["repos"]
+    if not downloader_loaded:
+        return abort(404, description=_("Downloader is not loaded."))
+
+    update_repos_cogs_form: UpdateReposCogsForm = UpdateReposCogsForm()
+    if not repos:
+        update_repos_cogs_form.update_repos.render_kw = {"disabled": True}
+    if not any(available_cog["installed"] for repo in repos for available_cog in repo["available_cogs"].values()):
+        update_repos_cogs_form.update_cogs.render_kw = {"disabled": True}
+    if update_repos_cogs_form.update_repos.data or update_repos_cogs_form.update_cogs.data:
+        if update_repos_cogs_form.validate_on_submit():
+            if update_repos_cogs_form.update_repos.data:
+                requeststr = {
+                    "jsonrpc": "2.0",
+                    "id": 0,
+                    "method": "DASHBOARDRPC_COGMANAGEMENT__UPDATE_REPOS",
+                    "params": [
+                        current_user.id,
+                    ],
+                }
+            elif update_repos_cogs_form.update_cogs.data:
+                requeststr = {
+                    "jsonrpc": "2.0",
+                    "id": 0,
+                    "method": "DASHBOARDRPC_COGMANAGEMENT__UPDATE_COGS",
+                    "params": [
+                        current_user.id,
+                    ],
+                }
+            result = await get_result(app, requeststr)
+            for notification in result["notifications"]:
+                flash(**notification)
+            raise RuntimeWarning()
+        elif update_repos_cogs_form.errors:
+            for field_name, error_messages in update_repos_cogs_form.errors.items():
+                flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
+
+    add_repo_form: AddRepoForm = AddRepoForm()
+    if add_repo_form.validate_on_submit():
+        requeststr = {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "DASHBOARDRPC_COGMANAGEMENT__ADD_REPO",
+            "params": [
+                current_user.id,
+                add_repo_form.name.data,
+                add_repo_form.repo_url.data,
+                add_repo_form.branch.data.strip() or None,
+            ],
+        }
+        result = await get_result(app, requeststr)
+        for notification in result["notifications"]:
+            flash(**notification)
+        raise RuntimeWarning()
+    elif add_repo_form.submit.data and add_repo_form.errors:
+        for field_name, error_messages in add_repo_form.errors.items():
+            flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
+
+    repos_actions_forms = {
+        r["name"]: RepoActionsForm(r)
+        for r in repos
+    }
+    for repo_name, repo_actions_form in repos_actions_forms.items():
+        if (
+            repo_actions_form.update_repo.data
+            or repo_actions_form.update_cogs_from_repo.data
+            or repo_actions_form.remove.data
+        ):
+            if repo_actions_form.validate_on_submit():
+                if repo_actions_form.update_repo.data:
+                    requeststr = {
+                        "jsonrpc": "2.0",
+                        "id": 0,
+                        "method": "DASHBOARDRPC_COGMANAGEMENT__UPDATE_REPO",
+                        "params": [
+                            current_user.id,
+                            repo_name,
+                        ],
+                    }
+                elif repo_actions_form.update_cogs_from_repo.data:
+                    requeststr = {
+                        "jsonrpc": "2.0",
+                        "id": 0,
+                        "method": "DASHBOARDRPC_COGMANAGEMENT__UPDATE_COGS_FROM_REPO",
+                        "params": [
+                            current_user.id,
+                            repo_name,
+                        ],
+                    }
+                elif repo_actions_form.remove.data:
+                    requeststr = {
+                        "jsonrpc": "2.0",
+                        "id": 0,
+                        "method": "DASHBOARDRPC_COGMANAGEMENT__REMOVE_REPO",
+                        "params": [
+                            current_user.id,
+                            repo_name,
+                        ],
+                    }
+                result = await get_result(app, requeststr)
+                for notification in result["notifications"]:
+                    flash(**notification)
+                raise RuntimeWarning()
+            elif repo_actions_form.errors:
+                for field_name, error_messages in repo_actions_form.errors.items():
+                    flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
+
+    cogs_actions_forms = {
+        r["name"]: {
+        cog_name: CogActionsForm(cog_name)
+        for cog_name in r["available_cogs"]
+        }
+        for r in repos
+    }
+    for repo_name, available_cogs in cogs_actions_forms.items():
+        for cog_name, cog_actions_form in available_cogs.items():
+            if (
+                cog_actions_form.install.data
+                or cog_actions_form.update.data
+                or cog_actions_form.pin_or_unpin.data
+                or cog_actions_form.uninstall.data
+            ):
+                if cog_actions_form.validate_on_submit():
+                    requeststr = {
+                        "jsonrpc": "2.0",
+                        "id": 0,
+                        "method": (
+                            "DASHBOARDRPC_COGMANAGEMENT__INSTALL_COG"
+                            if cog_actions_form.install.data
+                            else (
+                            "DASHBOARDRPC_COGMANAGEMENT__UPDATE_COG"
+                            if cog_actions_form.update.data
+                            else (
+                                "DASHBOARDRPC_COGMANAGEMENT__PIN_OR_UNPIN_COG"
+                                if cog_actions_form.pin_or_unpin.data
+                                else "DASHBOARDRPC_COGMANAGEMENT__UNINSTALL_COG"
+                            )
+                            )
+                        ),
+                        "params": [
+                            current_user.id,
+                            repo_name,
+                            cog_name,
+                        ],
+                    }
+                    result = await get_result(app, requeststr)
+                    for notification in result["notifications"]:
+                        flash(**notification)
+                    raise RuntimeWarning()
+                elif cog_actions_form.errors:
+                    for field_name, error_messages in cog_actions_form.errors.items():
+                        flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
+
+    return render_template(
+        "pages/cog_management_downloader.html",
+        repos_number=len(repos),
+        repos=repos,
+        update_repos_cogs_form=update_repos_cogs_form,
+        add_repo_form=add_repo_form,
+        repos_actions_forms=repos_actions_forms,
+        cogs_actions_forms=cogs_actions_forms,
+    )
+
+
+@blueprint.route("/cog-management/downloader/<repo>", methods=("GET", "POST"))
+@blueprint.route("/cog-management/<page>", methods=("GET", "POST"))
+@blueprint.route("/cog-management", methods=("GET", "POST"))
+@login_required
+async def cog_management(
+    page: typing.Optional[typing.Literal["cogs", "downloader", "slash"]] = None,
+    repo: typing.Optional[str] = None,
+):
+    if not current_user.is_authenticated or not current_user.is_owner:
+        return abort(403, description=_("You're not a bot owner!"))
+    if repo is not None:
+        page = "downloader"
+
+    requeststr = {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "DASHBOARDRPC_COGMANAGEMENT__GET_COGS",
+        "params": [current_user.id],
+    }
+    cogs = (await get_result(app, requeststr))["cogs"]
+    cogs_form: CogsForm = CogsForm(cogs=cogs)
+    if cogs_form.submit.data:
+        if cogs_form.validate_on_submit():
+            requeststr = {
+                "jsonrpc": "2.0",
+                "id": 0,
+                "method": "DASHBOARDRPC_COGMANAGEMENT__SET_COGS",
+                "params": [
+                    current_user.id,
+                    {cog["cog_name"]: cog["loaded"] for cog in cogs_form.cogs.data},
+                ],
+            }
+            result = await get_result(app, requeststr)
+            for notification in result["notifications"]:
+                flash(**notification)
+            return redirect(request.url)
+        elif cogs_form.errors:
+            for field_name, error_messages in cogs_form.errors.items():
+                if isinstance(error_messages[0], typing.Dict):
+                    for sub_field_name, sub_error_messages in error_messages[0].items():
+                        flash(f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}", category="warning")
+                    continue
+                flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
+
+    requeststr = {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "DASHBOARDRPC_COGMANAGEMENT__GET_REPOS",
+        "params": [current_user.id, False],
+    }
+    result = await get_result(app, requeststr)
+    downloader_loaded = result["status"] == 0
+    repo_names = (result)["repos"]
+    if request.method == "POST":
+        try:
+            await cog_management_downloader()
+        except RuntimeWarning:
+            return redirect(request.url)
+
+    requeststr = {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "DASHBOARDRPC_COGMANAGEMENT__GET_APPLICATION_COMMANDS",
+        "params": [current_user.id],
+    }
+    application_commands = (await get_result(app, requeststr))["application_commands"]
+    sync_application_commands_form: SyncApplicationCommandsForm = SyncApplicationCommandsForm()
+    if sync_application_commands_form.submit.data:
+        if sync_application_commands_form.validate_on_submit():
+            requeststr = {
+                "jsonrpc": "2.0",
+                "id": 0,
+                "method": "DASHBOARDRPC_COGMANAGEMENT__SYNC_APPLICATION_COMMANDS",
+                "params": [current_user.id],
+            }
+            result = await get_result(app, requeststr)
+            for notification in result["notifications"]:
+                flash(**notification)
+            return redirect(request.url)
+        elif sync_application_commands_form.errors:
+            for field_name, error_messages in sync_application_commands_form.errors.items():
+                flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
+    if application_commands:
+        application_commands_form: ApplicationCommandsForm = ApplicationCommandsForm(
+            application_commands=application_commands,
+        )
+        if application_commands_form.submit.data:
+            if application_commands_form.validate_on_submit():
+                for module in application_commands:
+                    for application_command in application_commands[module]:
+                        if (
+                            entry := next(
+                                entry for entry in application_commands_form.application_commands.data
+                                if (
+                                    entry["module"] == module
+                                    and entry["ac_type"] == application_command["type"]
+                                    and entry["ac_name"] == application_command["name"]
+                                )
+                            )
+                        ) is not None:
+                            application_command["enabled"] = entry["enabled"]
+                requeststr = {
+                    "jsonrpc": "2.0",
+                    "id": 0,
+                    "method": "DASHBOARDRPC_COGMANAGEMENT__SET_APPLICATION_COMMANDS",
+                    "params": [
+                        current_user.id,
+                        application_commands,
+                    ],
+                }
+                result = await get_result(app, requeststr)
+                for notification in result["notifications"]:
+                    flash(**notification)
+                return redirect(request.url)
+            elif application_commands_form.errors:
+                for field_name, error_messages in application_commands_form.errors.items():
+                    if isinstance(error_messages[0], typing.Dict):
+                        for sub_field_name, sub_error_messages in error_messages[0].items():
+                            flash(f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}", category="warning")
+                        continue
+                    flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
+        all_sub_enabled = {
+            module: all(
+                entry.enabled.data
+                for entry in application_commands_form.application_commands.default
+                if entry.module.data == module
+            )
+            for module in application_commands
+        }
+    else:
+        application_commands_form, all_sub_enabled = None, {}
+
+    return render_template(
+        "pages/cog_management.html",
+        page=page if page is not None and page in ("cogs", "downloader", "slash") else "cogs",
+        loaded_cogs_number=sum(cogs.values()),
+        cogs_number=len(cogs),
+        cogs_form=cogs_form,
+        downloader_loaded=downloader_loaded,
+        tab_name=repo if repo is not None and repo in repo_names
+        else
+        None,
+        application_commands_number=sum(len(v) for v in application_commands.values()),
+        sync_application_commands_form=sync_application_commands_form,
+        application_commands_form=application_commands_form,
+        all_sub_enabled=all_sub_enabled,
+    )
+
 
 @blueprint.route("/custom-page/<page_url>")
 async def custom_page(page_url: str):

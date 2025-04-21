@@ -1,0 +1,281 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  {{ _("Cog Management") }}
+{% endblock %}
+
+{% block stylesheets %}{% endblock %}
+
+{% block content %}
+  <main class="main-content position-relative border-radius-lg">
+    <div class="container-fluid">
+        <div  id="tabs-content">
+            <ul class="nav nav-pills position-relative end-0" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link {% if not page or page == "cogs" %}show active{% endif %}" id="cogs-tab" data-toggle="pill" href="#cogs" role="tab" aria-controls="cogs" aria-selected="true">
+                        <i class="fa fa-cogs opacity-10" style="vertical-align: -1px;"></i> {{ _("Cogs") }}
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if page and page == "downloader" %}show active{% endif %}" id="downloader-tab" data-toggle="pill" href="#downloader" role="tab" aria-controls="downloader" aria-selected="true">
+                        <i class="fa fa-download opacity-10" style="vertical-align: -1.5px;"></i> {{ _("Downloader") }}
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if page and page == "slash" %}show active{% endif %}" id="slash-tab" data-toggle="pill" href="#slash" role="tab" aria-controls="slash" aria-selected="true">
+                        <i class="fa fa-bolt opacity-10" style="vertical-align: -1.5px;"></i> {{ _("Slash") }}
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <br />
+        <div class="tab-content" id="admin-tabContent">
+
+            <div class="tab-pane fade {% if not page or page == "cogs" %}show active{% endif %}" id="cogs" role="tabpanel" aria-labelledby="cogs-tab">
+                <div class="card card-chart">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-sm-12 text-left">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <h2 class="card-title">{{ _("Cogs") }} ({{ loaded_cogs_number }} / {{ cogs_number }} {{ _("loaded")}})</h2>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <form action="" method="POST" role="form" enctype="multipart/form-data">
+                                    {{ cogs_form.hidden_tag() }}
+                                    {% for cog_form in cogs_form.cogs.default %}
+                                        <div>
+                                            {{ cog_form.hidden_tag() }}
+                                            <div class="form-check form-switch ps-0">
+                                                {{ cog_form.loaded(class="form-check-input ms-0", type="checkbox") }}
+                                                <label class="form-check-label">{{ cog_form.cog_name.data }}</label>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                    <div class="text-center">
+                                        {{ cogs_form.submit(class="btn mb-0 bg-gradient-" + variables["meta"]["color"] + " btn-md w-100 my-4") }}
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade {% if page and page == "downloader" %}show active{% endif %}" id="downloader" role="tabpanel" aria-labelledby="downloader-tab">
+                <div class="card card-chart">
+                    <div class="card-body">
+                        {% if downloader_loaded %}
+                            <div id="downloader-part">
+                                <div class="row">
+                                    <div class="col-sm-12 text-left">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <h2 class="card-title">{{ _("Downloader") }}</h2>
+                                        </div>
+                                    </div>
+                                </div>
+                                <h3>{{ _("Loading...") }}</h3>
+                            </div>
+                        {% else %}
+                            <h3>{{ _("The Downloader cog is not loaded.") }}</h3>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade {% if page and page == "slash" %}show active{% endif %}" id="slash" role="tabpanel" aria-labelledby="slash-tab">
+                <div class="card card-chart">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-sm-12 text-left">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <h2 class="card-title">{{ _("Slash") }} ({{ application_commands_number }} {% if application_commands_number != 1 %}{{ _("application commands") }}{% else %}{{ _("application command") }}{% endif %})</h2>
+                                    <form action="" method="POST" role="form" enctype="multipart/form-data">
+                                        {{ sync_application_commands_form.hidden_tag() }}
+                                        {{ sync_application_commands_form.submit(class="btn mb-0 bg-gradient-" + variables["meta"]["color"]) }}
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                {% if application_commands_form %}
+                                    <form action="" method="POST" role="form" enctype="multipart/form-data">
+                                        {{ application_commands_form.hidden_tag() }}
+                                        {% for application_command_form in application_commands_form.application_commands.default %}
+                                            {% if (loop.index0 == 0 or application_command_form.module.data != application_commands_form.application_commands.default[loop.index0 - 1].module.data) %}
+                                                {% if loop.index0 != 0 %}
+                                                    </div><br />
+                                                {% endif %}
+                                                <div>
+                                                <div class="form-check form-switch ps-0">
+                                                    <h4 class="text-center">{{ application_command_form.module.data }}</h4>
+                                                    {% if application_command_form.module.data != "(unknown)" %}
+                                                        &nbsp;<input class="form-check-input ms-0" type="checkbox" {% if all_sub_enabled[application_command_form.module.data] %}checked{% endif %} onclick="toggleModuleSub(this.parentElement.parentElement, this.checked);">
+                                                    {% endif %}
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                {{ application_command_form.hidden_tag() }}
+                                                <div class="form-check form-switch ps-0">
+                                                    {{ application_command_form.enabled(class="form-check-input ms-0", type="checkbox") }}
+                                                    <label class="form-check-label">{{ application_command_form.ac_type.data|upper }} {{ application_command_form.ac_name.data }}</label>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                        </div>
+                                        <div class="text-center">
+                                            {{ application_commands_form.submit(class="btn mb-0 bg-gradient-" + variables["meta"]["color"] + " btn-md w-100 my-4") }}
+                                        </div>
+                                    </form>
+                                {% else %}
+                                    <h3>{{ _("No application commands found.") }}</h3>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+  </main>
+{% endblock %}
+
+{% block javascripts %}
+    <script>
+        window.onload = function() {
+            resize_event = new Event("resize");
+            window.dispatchEvent(resize_event);
+        }
+    </script>
+    <script>
+        function changePage(page) {
+            var tab_nav_link = document.querySelector("#" + page + "-tab");
+            if (tab_nav_link) {
+                tab_nav_link.parentElement.parentElement.onmouseover(tab_nav_link);
+                tab_nav_link.click();
+            }
+        }
+        {% if page %}
+            document.addEventListener("DOMContentLoaded", function() {
+                changePage("{{ page }}");
+            });
+        {% endif %}
+    </script>
+    <script>
+        $('#tabs-content a[data-toggle="pill"]').on("shown.bs.tab", function (e) {
+            var base_url = '{{ url_for("base_blueprint.cog_management") }}';
+            var target_id = e.target.id.slice(0, -4);
+            if (target_id == "cogs") {
+                var new_url = base_url;
+            } else {
+                var new_url = base_url + "/" + target_id;
+            }
+            if (!(window.location.pathname.startsWith(new_url)) || (target_id == "cogs" && !(window.location.pathname == base_url))) {
+                // window.location.pathname = new_url;
+                window.history.pushState({}, "", new_url);
+            }
+        })
+    </script>
+    <script>
+        $('#repos-tabs a[data-toggle="pill"]').on("shown.bs.tab", function(e) {
+            var target_id = e.target.id.slice(0, -4);
+            var new_url = "/cog-management/downloader/" + target_id;
+            if (!(window.location.pathname.startsWith(new_url))) {
+            // window.location.pathname = new_url;
+            window.history.pushState({}, "", new_url);
+            }
+        });
+    </script>
+    <script>
+        function changePage(tab_name) {
+            var tab_nav_link = document.querySelector("#" + tab_name + "-tab");
+            if (tab_nav_link) {
+                tab_nav_link.parentElement.parentElement.onmouseover(tab_nav_link);
+                tab_nav_link.click();
+            }
+        }
+        document.addEventListener("DOMContentLoaded", function() {
+            var url = '{{ url_for("base_blueprint.cog_management_downloader") }}';
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var downloader_part = document.getElementById("downloader-part");
+                    downloader_part.innerHTML = xhr.responseText;
+                    {% if tab_name %}
+                        document.addEventListener("DOMContentLoaded", function() {
+                            setTimeout(function() {
+                            changePage("{{ tab_name }}");
+                            }, 500);
+                        });
+                    {% endif %}
+                }
+            };
+            xhr.send();
+        });
+    </script>
+    <script>
+        async function confirmRemoveRepo(event, name) {
+            if (confirmationDone) {
+                return true;
+            }
+            let target_button = event.target;
+            event.preventDefault();
+            SwalAlert.fire({
+                title: '{{ _("Do you really want to remove the repo") }} ' + "<code>" + name + "</code>" + '?',
+                text: '{{ _("You could add it again later.") }}',
+                confirmButtonText: '{{ _("Yes, remove!") }}',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    confirmationDone = true;
+                    target_button.click();
+                }
+            })
+            return false;
+        }
+        async function confirmInstallCog(event, repo_name, name) {
+            if (confirmationDone) {
+                return true;
+            }
+            let target_button = event.target;
+            event.preventDefault();
+            SwalAlert.fire({
+                title: '{{ _("Do you want to install the cog") }} ' + "<code>" + name + "</code>" + '{{ _(" from the repo") }} ' + "<code>" + repo_name + "</code>" + '?',
+                text: '{{ _("You could uninstall it later.") }}',
+                confirmButtonText: '{{ _("Yes, install!") }}',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    confirmationDone = true;
+                    target_button.click();
+                }
+            })
+            return false;
+        }
+        async function confirmUninstallCog(event, repo_name, name) {
+            if (confirmationDone) {
+                return true;
+            }
+            let target_button = event.target;
+            event.preventDefault();
+            SwalAlert.fire({
+                title: '{{ _("Do you really want to uninstall the cog") }} ' + "<code>" + name + "</code>" + '{{ _(" from the repo") }} ' + "<code>" + repo_name + "</code>" + '?',
+                text: '{{ _("You could reinstall it later.") }}',
+                confirmButtonText: '{{ _("Yes, uninstall!") }}',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    confirmationDone = true;
+                    target_button.click();
+                }
+            })
+            return false;
+        }
+    </script>
+    <script>
+        function toggleModuleSub(module, checked) {
+            var sub_elements = module.querySelectorAll("input[type='checkbox']");
+            for (var i = 0; i < sub_elements.length; i++) {
+                sub_elements[i].checked = checked;
+            }
+        }
+    </script>
+{% endblock %}

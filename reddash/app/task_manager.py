@@ -25,8 +25,6 @@ class TaskManager:
     ) -> None:
         try:
             while True:
-                if not once:
-                    await asyncio.sleep(self.app.config["WEBSOCKET_INTERVAL"])
                 if not self.app.running:
                     return
 
@@ -37,23 +35,22 @@ class TaskManager:
                     "params": [only_bot_variables, [self.app.host, self.app.port]] if method == "DASHBOARDRPC__GET_VARIABLES" else [],
                 }
                 if self.app.cog is None:
-                    with self.app.lock:
-                        # This needs to be inside the lock, or both threads will create a websocket.
-                        if not self.app.ws:
-                            initialized = initialize_websocket(self.app)
-                            if not initialized:
-                                continue
-                        result = await get_result(self.app, request, retry=False)
-                        if not result:
+                    # This needs to be inside the lock, or both threads will create a websocket.
+                    if not self.app.ws:
+                        initialized = initialize_websocket(self.app)
+                        if not initialized:
                             continue
-                        connected = check_for_disconnect(self.app, method, result)
-                        if not connected:
-                            continue
+                    result = await get_result(self.app, request, retry=False)
+                    if not result:
+                        continue
+                    connected = check_for_disconnect(self.app, result)
+                    if not connected:
+                        continue
                 else:
                     result = await get_result(self.app, request, retry=False)
                     if not result:
                         continue
-                    connected = check_for_disconnect(self.app, method, result)
+                    connected = check_for_disconnect(self.app, result)
                     if not connected:
                         continue
 
@@ -71,6 +68,7 @@ class TaskManager:
 
                 if once:
                     break
+                await asyncio.sleep(self.app.config["WEBSOCKET_INTERVAL"])
         except Exception:
             self.app.logger.exception(f"Background task `{method}` died unexpectedly.")
 
@@ -88,24 +86,23 @@ class TaskManager:
                         "method": "DASHBOARDRPC__CHECK_VERSION",
                         "params": [],
                     }
-                    with self.app.lock:
-                        if not self.app.ws:
-                            initialized = initialize_websocket(self.app)
-                            if not initialized:
-                                continue
+                    if not self.app.ws:
+                        initialized = initialize_websocket(self.app)
+                        if not initialized:
+                            continue
 
-                        result = await get_result(self.app, request, retry=False)
-                        if not result or "error" in result:
-                            continue
-                        if result.get("disconnected", False) or "version" not in result:
-                            continue
-                        if result["version"] != version != 0:
-                            self.ignore_disconnect: bool = True
-                            self.app.logger.info("RPC websocket behind. Closing and restarting...")
-                            self.app.ws.close()
-                            initialize_websocket(self.app)
-                            self.ignore_disconnect: bool = False
-                        version = result["version"]
+                    result = await get_result(self.app, request, retry=False)
+                    if not result or "error" in result:
+                        continue
+                    if result.get("disconnected", False) or "version" not in result:
+                        continue
+                    if result["version"] != version != 0:
+                        self.ignore_disconnect: bool = True
+                        self.app.logger.info("RPC websocket behind. Closing and restarting...")
+                        self.app.ws.close()
+                        initialize_websocket(self.app)
+                        self.ignore_disconnect: bool = False
+                    version = result["version"]
         except Exception as e:
             self.app.logger.exception(
                 "Background task `DASHBOARDRPC__CHECK_VERSION` died unexpectedly.", exc_info=e
