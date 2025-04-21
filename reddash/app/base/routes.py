@@ -1,5 +1,3 @@
-from gettext import install
-from turtle import update
 import typing  # isort:skip
 
 import base64
