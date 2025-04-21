@@ -294,8 +294,8 @@ class BabelCheck:
     def __call__(self, form: FlaskForm, field: wtforms.Field) -> None:
         if field.data == field.default:
             return
-        if self.check_reset and (not field.data or field.data.lower() in ("reset", "default")):
-            field.data = None
+        if self.check_reset and field.data.lower() in ("reset", "default"):
+            field.data = ""
             return
         try:
             locale = BabelLocale.parse(field.data, sep="-")
@@ -572,8 +572,8 @@ async def dashboard_guild(
                     "use_bot_color": guild_settings_form.use_bot_color.data,
                     "fuzzy": guild_settings_form.fuzzy.data,
                     "delete_delay": guild_settings_form.delete_delay.data,
-                    "locale": guild_settings_form.locale.data,
-                    "regional_format": guild_settings_form.regional_format.data,
+                    "locale": guild_settings_form.locale.data.strip() or None,
+                    "regional_format": guild_settings_form.regional_format.data.strip() or None,
                 },
             ],
         }
@@ -971,7 +971,7 @@ async def admin(
                     "invite_commands_scope": bot_settings_form.invite_commands_scope.data,
                     "invite_perms": bot_settings_form.invite_perms.data,
                     "locale": bot_settings_form.locale.data,
-                    "regional_format": bot_settings_form.regional_format.data,
+                    "regional_format": bot_settings_form.regional_format.data.strip() or None,
                 },
             ],
         }
