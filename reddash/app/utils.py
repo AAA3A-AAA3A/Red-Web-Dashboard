@@ -333,7 +333,10 @@ def register_blueprints(app: Flask) -> None:
             return redirect(url_for("login_blueprint.blacklisted"))
         if (
             app.locked
-            and not current_user.is_owner
+            and (
+                not current_user.is_authenticated
+                or not current_user.is_owner
+            )
             and not request.path.startswith("/static")
             and request.blueprint != "login_blueprint"
             and request.endpoint
