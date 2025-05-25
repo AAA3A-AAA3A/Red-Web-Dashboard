@@ -6,7 +6,7 @@ Copyright (c) 2020 - present Neuro Assassin (https://github.com/Cog-Creators/Red
 
 import typing
 
-__version__: str = "1.8.0"
+__version__: str = "1.8.1"
 __authors__: typing.List[str] = ["AAA3A", "Neuro Assassin"]
 
 from .app import FlaskApp
