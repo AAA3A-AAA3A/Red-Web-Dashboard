@@ -30,8 +30,37 @@ Just like for Red-DiscordBot, Red Dashboard requires it's own, separate virtual 
 
 You have two options for creating the virtual environment, depending on how you installed Red/Python:
 
-1. :ref:`using-pyenv-virtualenv` (only available for those who installed ``pyenv`` when installing Red)
-2. :ref:`using-venv` (available to anyone)
+1. :ref:`using-venv` (available to anyone)
+2. :ref:`using-pyenv-virtualenv` (only available for those who installed ``pyenv`` when installing Red)
+
+.. _using-venv:
+
+Using venv
+~~~~~~~~~~
+
+Red-Web-Dashboard, similar to Red-DiscordBot, requires a Python version of at least 3.8.1. For ease of use, we recommend to use the same exact Python version as you use for Red.
+
+First, create a virtual environment using whatever Python version you use for red. For example, if Python 3.11 was installed and being used for Red:
+
+.. prompt:: bash
+
+   python -m venv ~/reddashenv
+
+.. warning::
+
+   You cannot use your Red-DiscordBot virtual environment for Red-Web-Dashboard. The two packages use different versions of the same dependencies and will conflict.
+
+Next, enter your virtual environment with this command:
+
+.. prompt:: bash
+
+   source ~/reddashenv/bin/activate
+
+.. important::
+
+   You must activate the virtual environment with the above command every time you open a new shell to run, install or update Red-Web-Dashboard.
+
+*You can continue to* :ref:`installing-red-web-dashboard`.
 
 .. _using-pyenv-virtualenv:
 
@@ -67,35 +96,6 @@ Finally, enter your virtual environment with this command:
    You must activate the virtual environment with the above command every time you open a new shell to run, install or update Red Dashboard. You can check out other commands like ``pyenv local`` and ``pyenv global`` if you wish to keep the virtualenv activated all the time.
 
 *You can continue to* :ref:`installing-red-web-dashboard`.
-
-.. _using-venv:
-
-Using venv
-~~~~~~~~~~
-
-Red-Web-Dashboard, similar to Red-DiscordBot, requires a Python version of at least 3.8.1. For ease of use, we recommend to use the same exact Python version as you use for Red.
-
-First, create a virtual environment using whatever Python version you use for red. For example, if Python 3.11 was installed and being used for Red:
-
-.. prompt:: bash
-
-   python -m venv ~/reddashenv
-
-.. warning::
-
-   You cannot use your Red-DiscordBot virtual environment for Red-Web-Dashboard. The two packages use different versions of the same dependencies and will conflict.
-
-Next, enter your virtual environment with this command:
-
-.. prompt:: bash
-
-   source ~/reddashenv/bin/activate
-
-.. important::
-
-   You must activate the virtual environment with the above command every time you open a new shell to run, install or update Red-Web-Dashboard.
-
-*You can continue to* :ref:`installing-red-web-dashboard`.   
 
 .. _installing-red-web-dashboard:
 
