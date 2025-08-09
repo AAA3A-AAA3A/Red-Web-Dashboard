@@ -84,7 +84,7 @@ If you wish to access the Dashboard on a device that is connected to the same ne
 
 .. tip::
 
-   If you choose this option, registering the redirect won't be necessary if you use directly the `--host` cli flag.
+   If you choose this option, registering the redirect won't be necessary if you use directly the ``--host`` cli flag.
 
 Registering the redirect
 ~~~~~~~~~~~~~~~~~~~~~~~~

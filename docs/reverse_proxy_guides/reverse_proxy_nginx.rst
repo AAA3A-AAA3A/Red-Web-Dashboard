@@ -56,7 +56,7 @@ You probably don't want people visiting your domain to see that static Nginx wel
 
 .. warning::
 
-    You should use ``localhost`` instead of ``0.0.0.0`` to make the "real" webserver port private, and use the `--host localhost` cli flag for starting the webserver.
+    You should use ``localhost`` instead of ``0.0.0.0`` to make the "real" webserver port private, and use the ``--host localhost`` cli flag for starting the webserver.
 
 4. Enable the file by creating a link from it to the sites-enabled directory.
 
