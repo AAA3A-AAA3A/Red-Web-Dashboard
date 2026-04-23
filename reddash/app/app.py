@@ -13,14 +13,7 @@ import sys
 import threading
 
 from flask import Flask
-from flask_babel import Babel, _
-from flask_bootstrap import Bootstrap
-from flask_login import LoginManager
-from flask_moment import Moment
-from flask_sitemapper import Sitemapper
-from flask_talisman import Talisman
-from flask_wtf.csrf import CSRFProtect
-from markdown import Markdown
+from flask_babel import Babel
 from waitress import serve
 from werkzeug.serving import BaseWSGIServer, make_server
 
@@ -32,6 +25,15 @@ from .utils import (
     register_blueprints,
     register_extensions,
 )  # NOQA
+
+if typing.TYPE_CHECKING:
+    from flask_bootstrap import Bootstrap
+    from flask_login import LoginManager
+    from flask_moment import Moment
+    from flask_sitemapper import Sitemapper
+    from flask_talisman import Talisman
+    from flask_wtf.csrf import CSRFProtect
+    from markdown import Markdown
 
 
 class Lock:
@@ -62,7 +64,7 @@ class ServerThread(threading.Thread):
 class FlaskApp(Flask):
     def __init__(
         self,
-        cog: typing.Optional[typing.Any] = None,  # To don't use RPC.
+        cog: typing.Any | None = None,  # To don't use RPC.
         host: str = "0.0.0.0",
         port: int = 42356,
         rpc_port: int = 6133,
@@ -71,7 +73,7 @@ class FlaskApp(Flask):
     ) -> None:  # debug: bool = False,
         super().__init__(import_name=__name__, static_folder="static", template_folder="templates")
 
-        self.cog: typing.Optional[typing.Any] = cog
+        self.cog: typing.Any | None = cog
         self.host: str = host
         self.port: int = port
         self.rpc_port: int = rpc_port
@@ -83,8 +85,8 @@ class FlaskApp(Flask):
         self.babel: Babel = Babel(self)
 
         self.task_manager: TaskManager = TaskManager(self)
-        self.data: typing.Dict[str, typing.Any] = {}
-        self.variables: typing.Dict[str, typing.Any] = {}
+        self.data: dict[str, typing.Any] = {}
+        self.variables: dict[str, typing.Any] = {}
         self.server_thread: ServerThread = None
 
         self.login_manager: LoginManager = None
@@ -98,7 +100,7 @@ class FlaskApp(Flask):
         self.logger: logging.Logger = logging.getLogger("reddash")
         self.logger.setLevel(logging.DEBUG)
 
-        self.already_used_tokens: typing.Set[str] = set()
+        self.already_used_tokens: set[str] = set()
 
         self.locked: bool = False
 
@@ -120,11 +122,11 @@ class FlaskApp(Flask):
         self.config["WEBSOCKET_PORT"]: int = self.rpc_port
         self.config["WEBSOCKET_INTERVAL"]: int = self.interval
         self.config["RPC_CONNECTED"]: bool = False
-        self.config["LAUNCH"]: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        self.config["LAUNCH"]: datetime.datetime = datetime.datetime.now(tz=datetime.UTC)
         self.config["LAST_RPC_EVENT"]: datetime.datetime = self.config["LAUNCH"]
         await self.task_manager.update_data_variables("DASHBOARDRPC__GET_DATA")
         await self.task_manager.update_data_variables(
-            "DASHBOARDRPC__GET_VARIABLES", only_bot_variables=True
+            "DASHBOARDRPC__GET_VARIABLES", only_bot_variables=True,
         )
         self.task_manager.start_tasks()
 
@@ -157,7 +159,7 @@ class FlaskApp(Flask):
         # t = threading.Thread(target=partial_run)
         if self.cog is not None:
             self.server_thread: ServerThread = ServerThread(
-                app=self, host=self.host, port=self.port
+                app=self, host=self.host, port=self.port,
             )
             self.server_thread.start()
         else:

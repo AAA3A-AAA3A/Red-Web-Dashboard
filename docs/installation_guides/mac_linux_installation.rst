@@ -7,7 +7,7 @@ Mac/Linux Installation
 
 .. attention::
 
-   This webserver and it's accompanying cog is built for Red-DiscordBot. It will not work with other bots. If you haven’t already, install Red `here <https://docs.discord.red/en/stable/>`__.
+   This webserver and it's accompanying cog is built for Red-DiscordBot. It will not work with other bots. If you haven't already, install Red `here <https://docs.discord.red/en/stable/>`__.
 
 .. warning::
 
@@ -38,7 +38,7 @@ You have two options for creating the virtual environment, depending on how you 
 Using venv
 ~~~~~~~~~~
 
-Red-Web-Dashboard, similar to Red-DiscordBot, requires a Python version of at least 3.8.1. For ease of use, we recommend to use the same exact Python version as you use for Red.
+Red-Web-Dashboard, similar to Red-DiscordBot, requires a Python version of at least 3.10.0. For ease of use, we recommend to use the same exact Python version as you use for Red.
 
 First, create a virtual environment using whatever Python version you use for red. For example, if Python 3.11 was installed and being used for Red:
 

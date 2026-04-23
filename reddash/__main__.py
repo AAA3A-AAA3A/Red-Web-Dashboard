@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 """
 License: Commercial
 Copyright (c) 2019 - present AppSeed.us
@@ -10,9 +9,8 @@ import asyncio
 import logging
 
 import rich
-from rich import columns
+from rich import columns, panel, progress, rule
 from rich import logging as rich_logging
-from rich import panel, progress, rule
 from rich import table as rtable
 from rich.console import Console
 from rich.style import Style
@@ -37,8 +35,8 @@ rich_console.push_theme(
             "logging.level.trace": Style(color="white", italic=True, dim=True),
             "repr.number": Style(color="cyan"),
             "repr.url": Style(underline=True, italic=True, bold=False, color="cyan"),
-        }
-    )
+        },
+    ),
 )
 
 parser: argparse.ArgumentParser = argparse.ArgumentParser()
@@ -64,7 +62,7 @@ async def _main():
     table.add_row("Environment", "Development" if app.dev else "Production")
     # table.add_row("Logging level", "Debug" if kwargs["debug"] else "Warning")
     progress_bar = progress.Progress(
-        "{task.description}", progress.TextColumn("{task.fields[status]}\n")
+        "{task.description}", progress.TextColumn("{task.fields[status]}\n"),
     )
     progress_bar.print(rule.Rule("Red-Web-Dashboard - Webserver"))
     disclaimer = "This is an instance of Red-DiscordBot's Dashboard, created initially by Neuro Assassin (https://github.com/NeuroAssassin) then forked by AAA3A (https://github.com/AAA3A-AAA3A). This package isn't endorsed by the Org at all.\n\nThis package is protected under the AGPL License. Any action that will break this license (including but not limited to, removal of credits) may result in a DMCA takedown request, or other legal consequences.\nYou can view the license at https://github.com/AAA3A-AAA3A/Red-Web-Dashboard/blob/main/LICENSE."

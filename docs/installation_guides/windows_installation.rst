@@ -26,7 +26,7 @@ This guide recommends using the same requisites that Red-DiscordBot uses. To ens
 Creating a virtual environment
 ------------------------------
 
-Just like for Red-DiscordBot, Red-Web-Dashboard requires it’s own, separate virtual environment to isolate dependencies. Red Dashboard also requires a Python version minimum of 3.8.1, and it is recommended to use the same Python version as you use for Red-Discord Bot.
+Just like for Red-DiscordBot, Red-Web-Dashboard requires it's own, separate virtual environment to isolate dependencies. Red Dashboard also requires a Python version minimum of 3.10.0, and it is recommended to use the same Python version as you use for Red-Discord Bot.
 
 First, create a virtual environment using whatever Python version you use for red. For example, if Python 3.11 was installed and being used for Red:
 

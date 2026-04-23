@@ -6,16 +6,15 @@ import datetime
 import random
 import string
 
-from reddash.app.app import app
-
 import aiohttp
-import jwt
 from django.utils.http import url_has_allowed_host_and_scheme
 from flask import abort, flash, redirect, render_template, request, session, url_for
 from flask_babel import _
 from flask_login import current_user, login_fresh, login_user, logout_user
 
-from ..utils import User
+from reddash.app.app import app
+from reddash.app.utils import User
+
 from . import blueprint
 
 current_user: User
@@ -37,7 +36,7 @@ async def login():
     if app.data["core"]["secret"] is None:
         flash(
             _(
-                "Authorization is unavailable for Red-Web-Dashboard until setting a secret Discord oauth key. If you believe this message is delivered in error, please contact the developer for assistance."
+                "Authorization is unavailable for Red-Web-Dashboard until setting a secret Discord oauth key. If you believe this message is delivered in error, please contact the developer for assistance.",
             ),
             category="danger",
         )
@@ -57,14 +56,14 @@ async def discord_oauth():
     session["state"] = state
     session["next"] = request.args.get("next")
     return redirect(
-        f"https://discordapp.com/api/oauth2/authorize?client_id={app.variables['bot']['application_id']}&redirect_uri={redirect_uri}&response_type=code&scope=identify&state={state}"
+        f"https://discordapp.com/api/oauth2/authorize?client_id={app.variables['bot']['application_id']}&redirect_uri={redirect_uri}&response_type=code&scope=identify&state={state}",
     )
 
 
 @blueprint.route("/callback")
 async def callback():
     redirecting_to: str = (request.args.get("next") or session.get("next")) or url_for(
-        "base_blueprint.index"
+        "base_blueprint.index",
     )
     # `url_has_allowed_host_and_scheme` should check if the url is safe for redirects, meaning it matches the request host.
     if not url_has_allowed_host_and_scheme(redirecting_to, request.host):
@@ -77,7 +76,7 @@ async def callback():
     except KeyError:
         flash(
             _(
-                "Authorization failed due to cancellation. Click again below if you wish to re-attempt authorizing."
+                "Authorization failed due to cancellation. Click again below if you wish to re-attempt authorizing.",
             ),
             category="danger",
         )
@@ -85,7 +84,7 @@ async def callback():
     if "state" not in session or "state" not in request.args:
         flash(
             _(
-                "Authorization must be directed through this login page to ensure protection against CSRF. Please re-authenticate."
+                "Authorization must be directed through this login page to ensure protection against CSRF. Please re-authenticate.",
             ),
             category="danger",
         )
@@ -93,7 +92,7 @@ async def callback():
     if session.pop("state") != request.args["state"]:
         flash(
             _(
-                "Your authentication request contained a different state than when your authorization process was initiated. Please re-attempt."
+                "Your authentication request contained a different state than when your authorization process was initiated. Please re-attempt.",
             ),
             category="danger",
         )
@@ -116,7 +115,7 @@ async def callback():
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     async with aiohttp.ClientSession() as aiohttp_session:
         async with aiohttp_session.post(
-            "https://discordapp.com/api/v9/oauth2/token", data=data, headers=headers
+            "https://discordapp.com/api/v9/oauth2/token", data=data, headers=headers,
         ) as r:
             response = await r.json()
             try:
@@ -125,14 +124,14 @@ async def callback():
                 app.logger.error(f"Failed to log someone in.\n{response}", exc_info=e)
                 flash(
                     _(
-                        "Authorization failed due to issues on the Discord API. Please re-attempt to authorize below, or contact the developer for assistance if this issue persists."
+                        "Authorization failed due to issues on the Discord API. Please re-attempt to authorize below, or contact the developer for assistance if this issue persists.",
                     ),
                     category="danger",
                 )
                 return redirect(url_for("login_blueprint.login", next=request.args.get("next")))
 
         async with aiohttp_session.get(
-            "https://discordapp.com/api/v9/users/@me", headers={"Authorization": f"Bearer {token}"}
+            "https://discordapp.com/api/v9/users/@me", headers={"Authorization": f"Bearer {token}"},
         ) as r:
             new_data = await r.json()
             try:
@@ -140,7 +139,9 @@ async def callback():
                     id=int(new_data["id"]),
                     name=new_data["username"],
                     global_name=new_data["global_name"],
-                    avatar_url=f"https://cdn.discordapp.com/avatars/{new_data['id']}/{new_data['avatar']}.png" if new_data["avatar"] is not None else None,
+                    avatar_url=f"https://cdn.discordapp.com/avatars/{new_data['id']}/{new_data['avatar']}.png"
+                    if new_data["avatar"] is not None
+                    else None,
                 )
                 login_user(
                     user=user,
@@ -151,7 +152,7 @@ async def callback():
                 app.logger.error(f"Failed to obtain a user's profile.\n{new_data}", exc_info=e)
                 flash(
                     _(
-                        "Authorization failed due to issues on the Discord API. Please re-attempt to authorize below, or contact the developer for assistance if this issue persists."
+                        "Authorization failed due to issues on the Discord API. Please re-attempt to authorize below, or contact the developer for assistance if this issue persists.",
                     ),
                     category="danger",
                 )

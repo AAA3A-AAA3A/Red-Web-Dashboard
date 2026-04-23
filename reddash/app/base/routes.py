@@ -4,8 +4,7 @@ import base64
 import datetime
 from copy import deepcopy
 
-from reddash.app.app import app
-
+import wtforms
 from babel import Locale as BabelLocale
 from babel import UnknownLocaleError
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -25,14 +24,15 @@ from flask_babel import _
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField
-import wtforms
 from markupsafe import Markup
 
-from ..utils import AVAILABLE_COLORS, User, get_result, humanize_timedelta
+from reddash.app.app import app
+from reddash.app.utils import AVAILABLE_COLORS, User, get_result, humanize_timedelta
+
 from . import blueprint
 
 current_user: User
-from ..pagination import Pagination
+from reddash.app.pagination import Pagination
 
 # <--------- Index ---------->
 
@@ -52,7 +52,7 @@ async def set_color():
         resp.set_cookie(
             key="color",
             value=color,
-            expires=datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(days=365),
+            expires=datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(days=365),
         )
     else:
         resp.delete_cookie("color")
@@ -70,7 +70,7 @@ async def set_background_theme():
         resp.set_cookie(
             key="background_theme",
             value=background_theme,
-            expires=datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(days=365),
+            expires=datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(days=365),
         )
     else:
         resp.delete_cookie("background_theme")
@@ -88,7 +88,7 @@ async def set_sidenav_theme():
         resp.set_cookie(
             key="sidenav_theme",
             value=sidenav_theme,
-            expires=datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(days=365),
+            expires=datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(days=365),
         )
     else:
         resp.delete_cookie("sidenav_theme")
@@ -110,9 +110,7 @@ app.add_url_rule(
     "/.well-known/<path:filename>",
     endpoint=".well-known",
     host=None,
-    view_func=lambda **kw: send_from_directory(
-        ".well-known", path=kw["filename"]
-    ),
+    view_func=lambda **kw: send_from_directory(".well-known", path=kw["filename"]),
 )
 
 
@@ -127,7 +125,7 @@ async def credits():
 @app.site_mapper.include()
 @blueprint.route("/commands/<cog>")
 @blueprint.route("/commands")
-async def commands(cog: typing.Optional[str] = None):
+async def commands(cog: str | None = None):
     cogs = {}
     commands = deepcopy(app.variables["commands"])
     len_cogs = 0
@@ -230,11 +228,11 @@ async def get_guild(guild_id: int, for_third_parties: bool = False):
     if guild["status"] == 1:
         return abort(404, description=_("Guild not found or missing access to it."))
     guild["created_at"] = datetime.datetime.fromtimestamp(
-        guild["created_at"], tz=datetime.timezone.utc
+        guild["created_at"], tz=datetime.UTC,
     )
     if guild["joined_at"] is not None:
         guild["joined_at"] = datetime.datetime.fromtimestamp(
-            guild["joined_at"], tz=datetime.timezone.utc
+            guild["joined_at"], tz=datetime.UTC,
         )
 
     if current_user.id in app.variables["bot"]["owner_ids"]:
@@ -250,10 +248,9 @@ async def get_guild(guild_id: int, for_third_parties: bool = False):
             if result["status"] == 0:
                 flash(_("Successfully left the guild."), category="success")
                 return redirect(url_for("base_blueprint.dashboard"))
-            else:
-                flash(_("Failed to leave the guild."), category="danger")
-                return redirect(request.url)
-        elif leave_guild_form.submit.data and leave_guild_form.errors:
+            flash(_("Failed to leave the guild."), category="danger")
+            return redirect(request.url)
+        if leave_guild_form.submit.data and leave_guild_form.errors:
             for field_name, error_messages in leave_guild_form.errors.items():
                 flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
     else:
@@ -277,13 +274,13 @@ class PrefixesCheck:
                         "Prefixes must be between %(min)s and %(max)s characters long.",
                         min=app.variables["constants"]["MIN_PREFIX_LENGTH"],
                         max=app.variables["constants"]["MAX_PREFIX_LENGTH"],
-                    )
+                    ),
                 )
             if prefix.startswith("/"):
                 raise wtforms.validators.ValidationError(
                     _(
-                        "Prefixes cannot start with `/`, as it conflicts with Discord's slash commands."
-                    )
+                        "Prefixes cannot start with `/`, as it conflicts with Discord's slash commands.",
+                    ),
                 )
 
 
@@ -301,17 +298,17 @@ class BabelCheck:
             locale = BabelLocale.parse(field.data, sep="-")
         except (ValueError, UnknownLocaleError):
             raise wtforms.validators.ValidationError(
-                _("Invalid language code. Use format: `en-US`.")
+                _("Invalid language code. Use format: `en-US`."),
             )
         if locale.territory is None:
             raise wtforms.validators.ValidationError(
-                _("Invalid format - language code has to include country code, e.g. `en-US`.")
+                _("Invalid format - language code has to include country code, e.g. `en-US`."),
             )
         field.data = f"{locale.language}-{locale.territory}"
 
 
 class GuildSettingsForm(FlaskForm):
-    def __init__(self, guild: typing.Dict[str, typing.Any]) -> None:
+    def __init__(self, guild: dict[str, typing.Any]) -> None:
         super().__init__(prefix="guild_settings_form_")
         if not guild["settings"]["edit_permission"]:
             for field in self:
@@ -356,20 +353,20 @@ class GuildSettingsForm(FlaskForm):
         self.regional_format.default = guild["settings"]["regional_format"]
 
     bot_nickname: wtforms.StringField = wtforms.StringField(
-        _("Bot Nickname:"), validators=[wtforms.validators.Length(max=32)]
+        _("Bot Nickname:"), validators=[wtforms.validators.Length(max=32)],
     )
     prefixes: wtforms.StringField = wtforms.StringField(
-        _("Prefixes:"), validators=[wtforms.validators.Optional(), PrefixesCheck()]
+        _("Prefixes:"), validators=[wtforms.validators.Optional(), PrefixesCheck()],
     )
     admin_roles: wtforms.SelectMultipleField = wtforms.SelectMultipleField(
-        _("Admin Roles:"), choices=[]
+        _("Admin Roles:"), choices=[],
     )
     mod_roles: wtforms.SelectMultipleField = wtforms.SelectMultipleField(
-        _("Mod Roles:"), choices=[]
+        _("Mod Roles:"), choices=[],
     )
     ignored: wtforms.BooleanField = wtforms.BooleanField(_("Ignore commands in this guild."))
     disabled_commands: wtforms.SelectMultipleField = wtforms.SelectMultipleField(
-        _("Disabled Commands:"), choices=[]
+        _("Disabled Commands:"), choices=[],
     )
     embeds: wtforms.BooleanField = wtforms.BooleanField(_("Use embeds in responses."))
     use_bot_color: wtforms.BooleanField = wtforms.BooleanField(_("Use bot set color in embeds."))
@@ -382,10 +379,11 @@ class GuildSettingsForm(FlaskForm):
         ],
     )
     locale: wtforms.StringField = wtforms.StringField(
-        _("Locale:"), validators=[wtforms.validators.InputRequired(), BabelCheck(check_reset=True)]
+        _("Locale:"), validators=[wtforms.validators.InputRequired(), BabelCheck(check_reset=True)],
     )
     regional_format: wtforms.StringField = wtforms.StringField(
-        _("Regional Format:"), validators=[wtforms.validators.Optional(), BabelCheck(check_reset=True)]
+        _("Regional Format:"),
+        validators=[wtforms.validators.Optional(), BabelCheck(check_reset=True)],
     )
     submit: wtforms.SubmitField = wtforms.SubmitField(_("Save Modifications"))
 
@@ -412,24 +410,41 @@ class MarkdownTextAreaField(wtforms.TextAreaField):
 
 
 class AliasForm(FlaskForm):
-    alias_name: wtforms.StringField = wtforms.StringField(_("Name"), validators=[wtforms.validators.InputRequired(), wtforms.validators.Regexp(r"^[^\s]+$"), wtforms.validators.Length(max=300)])
-    command: MarkdownTextAreaField = MarkdownTextAreaField(_("Command"), validators=[wtforms.validators.InputRequired(), wtforms.validators.Length(max=1700)])
+    alias_name: wtforms.StringField = wtforms.StringField(
+        _("Name"),
+        validators=[
+            wtforms.validators.InputRequired(),
+            wtforms.validators.Regexp(r"^[^\s]+$"),
+            wtforms.validators.Length(max=300),
+        ],
+    )
+    command: MarkdownTextAreaField = MarkdownTextAreaField(
+        _("Command"),
+        validators=[wtforms.validators.InputRequired(), wtforms.validators.Length(max=1700)],
+    )
 
 
 class AliasesForm(FlaskForm):
-    def __init__(self, aliases: typing.Dict[str, str]) -> None:
+    def __init__(self, aliases: dict[str, str]) -> None:
         super().__init__(prefix="aliases_form_")
         for name, command in aliases.items():
             self.aliases.append_entry({"alias_name": name, "command": command})
-        self.aliases.default = [entry for entry in self.aliases.entries if entry.csrf_token.data is None]
-        self.aliases.entries = [entry for entry in self.aliases.entries if entry.csrf_token.data is not None]
+        self.aliases.default = [
+            entry for entry in self.aliases.entries if entry.csrf_token.data is None
+        ]
+        self.aliases.entries = [
+            entry for entry in self.aliases.entries if entry.csrf_token.data is not None
+        ]
 
     aliases: wtforms.FieldList = wtforms.FieldList(wtforms.FormField(AliasForm))
     submit: wtforms.SubmitField = wtforms.SubmitField(_("Save Modifications"))
 
 
 class CustomCommandResponseForm(FlaskForm):
-    response: MarkdownTextAreaField = MarkdownTextAreaField(_("Response"), validators=[wtforms.validators.InputRequired(), wtforms.validators.Length(max=2000)])
+    response: MarkdownTextAreaField = MarkdownTextAreaField(
+        _("Response"),
+        validators=[wtforms.validators.InputRequired(), wtforms.validators.Length(max=2000)],
+    )
 
 
 class CustomCommandForm(FlaskForm):
@@ -438,20 +453,46 @@ class CustomCommandForm(FlaskForm):
         super().__init__(*args, **kwargs)
         for response in responses:
             self.responses.append_entry({"response": response})
-        self.responses.default = [entry for entry in self.responses.entries if entry.response.data and entry.csrf_token.data is None]
-        self.responses.entries = [entry for entry in self.responses.entries if not entry.response.data or entry.csrf_token.data is not None]
+        self.responses.default = [
+            entry
+            for entry in self.responses.entries
+            if entry.response.data and entry.csrf_token.data is None
+        ]
+        self.responses.entries = [
+            entry
+            for entry in self.responses.entries
+            if not entry.response.data or entry.csrf_token.data is not None
+        ]
 
-    command: wtforms.StringField = wtforms.StringField(_("Name"), validators=[wtforms.validators.InputRequired(), wtforms.validators.Regexp(r"^[^\sA-Z]+$"), wtforms.validators.Length(max=300)])
-    responses: wtforms.FieldList = wtforms.FieldList(wtforms.FormField(CustomCommandResponseForm), _("Responses"), min_entries=1)
+    command: wtforms.StringField = wtforms.StringField(
+        _("Name"),
+        validators=[
+            wtforms.validators.InputRequired(),
+            wtforms.validators.Regexp(r"^[^\sA-Z]+$"),
+            wtforms.validators.Length(max=300),
+        ],
+    )
+    responses: wtforms.FieldList = wtforms.FieldList(
+        wtforms.FormField(CustomCommandResponseForm), _("Responses"), min_entries=1,
+    )
 
 
 class CustomCommandsForm(FlaskForm):
-    def __init__(self, custom_commands: typing.Dict[str, typing.List[str]]) -> None:
+    def __init__(self, custom_commands: dict[str, list[str]]) -> None:
         super().__init__(prefix="custom_commands_form_")
         for command, responses in custom_commands.items():
-            self.custom_commands.append_entry({"command": command, "responses": [responses] if isinstance(responses, str) else responses})
-        self.custom_commands.default = [entry for entry in self.custom_commands.entries if entry.csrf_token.data is None]
-        self.custom_commands.entries = [entry for entry in self.custom_commands.entries if entry.csrf_token.data is not None]
+            self.custom_commands.append_entry(
+                {
+                    "command": command,
+                    "responses": [responses] if isinstance(responses, str) else responses,
+                },
+            )
+        self.custom_commands.default = [
+            entry for entry in self.custom_commands.entries if entry.csrf_token.data is None
+        ]
+        self.custom_commands.entries = [
+            entry for entry in self.custom_commands.entries if entry.csrf_token.data is not None
+        ]
 
     custom_commands: wtforms.FieldList = wtforms.FieldList(wtforms.FormField(CustomCommandForm))
     submit: wtforms.SubmitField = wtforms.SubmitField(_("Save Modifications"))
@@ -463,8 +504,8 @@ class CustomCommandsForm(FlaskForm):
 @login_required
 async def dashboard_guild(
     guild_id: str,
-    page: typing.Optional[typing.Literal["overview", "settings", "third-parties"]] = None,
-    third_party: typing.Optional[str] = None,
+    page: typing.Literal["overview", "settings", "third-parties"] | None = None,
+    third_party: str | None = None,
 ):
     try:
         guild_id = int(guild_id)
@@ -491,10 +532,7 @@ async def dashboard_guild(
                 "params": [
                     current_user.id,
                     guild_id,
-                    {
-                        alias["alias_name"]: alias["command"]
-                        for alias in aliases_form.aliases.data
-                    },
+                    {alias["alias_name"]: alias["command"] for alias in aliases_form.aliases.data},
                 ],
             }
             result = await get_result(app, requeststr)
@@ -505,11 +543,14 @@ async def dashboard_guild(
                     flash(error, category="warning")
                 flash(_("Failed to save the modifications."), category="danger")
             return redirect(request.url)
-        elif aliases_form.submit.data and aliases_form.errors:
+        if aliases_form.submit.data and aliases_form.errors:
             for field_name, error_messages in aliases_form.errors.items():
-                if isinstance(error_messages[0], typing.Dict):
+                if isinstance(error_messages[0], dict):
                     for sub_field_name, sub_error_messages in error_messages[0].items():
-                        flash(f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}", category="warning")
+                        flash(
+                            f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}",
+                            category="warning",
+                        )
                     continue
                 flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
     else:
@@ -523,7 +564,9 @@ async def dashboard_guild(
     }
     custom_commands = await get_result(app, requeststr)
     if custom_commands["status"] == 0:
-        custom_commands_form: CustomCommandsForm = CustomCommandsForm(custom_commands=custom_commands["custom_commands"])
+        custom_commands_form: CustomCommandsForm = CustomCommandsForm(
+            custom_commands=custom_commands["custom_commands"],
+        )
         if custom_commands_form.validate_on_submit():
             requeststr = {
                 "jsonrpc": "2.0",
@@ -533,7 +576,11 @@ async def dashboard_guild(
                     current_user.id,
                     guild_id,
                     {
-                        custom_command["command"]: (custom_command["responses"][0]["response"] if len(custom_command["responses"]) == 1 else [response["response"] for response in custom_command["responses"]])
+                        custom_command["command"]: (
+                            custom_command["responses"][0]["response"]
+                            if len(custom_command["responses"]) == 1
+                            else [response["response"] for response in custom_command["responses"]]
+                        )
                         for custom_command in custom_commands_form.custom_commands.data
                     },
                 ],
@@ -563,7 +610,11 @@ async def dashboard_guild(
                 guild_id,
                 {
                     "bot_nickname": guild_settings_form.bot_nickname.data.strip() or None,
-                    "prefixes": (prefixes if (prefixes := guild_settings_form.prefixes.data.split(";;|;;")) != [""] else []),
+                    "prefixes": (
+                        prefixes
+                        if (prefixes := guild_settings_form.prefixes.data.split(";;|;;")) != [""]
+                        else []
+                    ),
                     "admin_roles": guild_settings_form.admin_roles.data,
                     "mod_roles": guild_settings_form.mod_roles.data,
                     "ignored": guild_settings_form.ignored.data,
@@ -582,7 +633,7 @@ async def dashboard_guild(
             if result.get("change_nickname_error"):
                 flash(
                     _(
-                        "Failed to change the bot's nickname. Make sure the bot has the required permissions."
+                        "Failed to change the bot's nickname. Make sure the bot has the required permissions.",
                     ),
                     category="warning",
                 )
@@ -590,7 +641,7 @@ async def dashboard_guild(
         else:
             flash(_("Failed to save the modifications."), category="danger")
         return redirect(request.url)
-    elif guild_settings_form.submit.data and guild_settings_form.errors:
+    if guild_settings_form.submit.data and guild_settings_form.errors:
         for field_name, error_messages in guild_settings_form.errors.items():
             flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
@@ -612,7 +663,7 @@ async def dashboard_guild(
     )
 
 
-async def get_third_parties(guild_id: typing.Optional[str] = None):
+async def get_third_parties(guild_id: str | None = None):
     _third_parties = {
         third_party: pages.copy() for third_party, pages in app.variables["third_parties"].items()
     }
@@ -625,7 +676,12 @@ async def get_third_parties(guild_id: typing.Optional[str] = None):
             continue
         if not pages:
             continue
-        if all(page["hidden"] or (page["is_owner"] and not is_owner) or (guild_id is not None and "guild_id" not in page["context_ids"]) for page in pages.values()):
+        if all(
+            page["hidden"]
+            or (page["is_owner"] and not is_owner)
+            or (guild_id is not None and "guild_id" not in page["context_ids"])
+            for page in pages.values()
+        ):
             continue
         real_cog_name = third_party  # _third_parties[third_party][list(pages)[0]]["real_cog_name"]
         if real_cog_name in cogs_data:
@@ -641,7 +697,9 @@ async def get_third_parties(guild_id: typing.Optional[str] = None):
             "null" in _third_parties[third_party]
             and not _third_parties[third_party]["null"]["hidden"]
             and not (_third_parties[third_party]["null"]["is_owner"] and not is_owner)
-            and (guild_id is None or "guild_id" in _third_parties[third_party]["null"]["context_ids"])
+            and (
+                guild_id is None or "guild_id" in _third_parties[third_party]["null"]["context_ids"]
+            )
         ):
             third_parties[third_party]["Main Page"] = _third_parties[third_party].pop("null")
             third_parties[third_party]["Main Page"]["url"] = url_for(
@@ -683,16 +741,16 @@ class DiscordProfileForm(FlaskForm):
     avatar: FileField = FileField()
     avatar_choice: wtforms.HiddenField = wtforms.HiddenField(default="keep")
     username: wtforms.StringField = wtforms.StringField(
-        _("Username:"), validators=[wtforms.validators.Length(max=32)]
+        _("Username:"), validators=[wtforms.validators.Length(max=32)],
     )
     description: MarkdownTextAreaField = MarkdownTextAreaField(
-        _("Description:"), validators=[wtforms.validators.Length(max=400)]
+        _("Description:"), validators=[wtforms.validators.Length(max=400)],
     )
     submit: wtforms.SubmitField = wtforms.SubmitField(_("Save Modifications"))
 
 
 class DashboardSettingsForm(FlaskForm):
-    def __init__(self, settings: typing.Dict[str, typing.Any]) -> None:
+    def __init__(self, settings: dict[str, typing.Any]) -> None:
         super().__init__(prefix="dashboard_settings_form_")
         self.title.default = settings["title"]
         self.icon.default = settings["icon"]
@@ -709,7 +767,9 @@ class DashboardSettingsForm(FlaskForm):
 
     title: wtforms.StringField = wtforms.StringField(_("Title:"))
     icon: wtforms.StringField = wtforms.StringField(_("Icon:"))
-    website_description: wtforms.StringField = wtforms.StringField(_("Website (Short) Description:"))
+    website_description: wtforms.StringField = wtforms.StringField(
+        _("Website (Short) Description:"),
+    )
     description: MarkdownTextAreaField = MarkdownTextAreaField(_("Description:"))
     support_server: wtforms.URLField = wtforms.URLField(_("Support Server URL:"))
     default_color: wtforms.SelectField = wtforms.SelectField(
@@ -728,13 +788,13 @@ class DashboardSettingsForm(FlaskForm):
         validators=[wtforms.validators.InputRequired()],
     )
     disabled_third_parties: wtforms.SelectMultipleField = wtforms.SelectMultipleField(
-        _("Disabled Third Parties:"), choices=[]
+        _("Disabled Third Parties:"), choices=[],
     )
     submit: wtforms.SubmitField = wtforms.SubmitField(_("Save Modifications"))
 
 
 class BotSettingsForm(FlaskForm):
-    def __init__(self, settings: typing.Dict[str, typing.Any]) -> None:
+    def __init__(self, settings: dict[str, typing.Any]) -> None:
         super().__init__(prefix="bot_settings_form_")
         self.prefixes.default = ";;|;;".join(settings["prefixes"])
         self.invoke_error_msg.default = settings["invoke_error_msg"]
@@ -767,34 +827,44 @@ class BotSettingsForm(FlaskForm):
         self.fuzzy.default = self.fuzzy.checked = settings["fuzzy"]
         self.use_buttons.default = self.use_buttons.checked = settings["use_buttons"]
         self.invite_public.default = self.invite_public.checked = settings["invite_public"]
-        self.invite_commands_scope.default = self.invite_commands_scope.checked = settings["invite_commands_scope"]
-        self.invite_perms.validators.append(wtforms.validators.NumberRange(min=0, max=app.variables["constants"]["MAX_DISCORD_PERMISSIONS_VALUE"]))
+        self.invite_commands_scope.default = self.invite_commands_scope.checked = settings[
+            "invite_commands_scope"
+        ]
+        self.invite_perms.validators.append(
+            wtforms.validators.NumberRange(
+                min=0, max=app.variables["constants"]["MAX_DISCORD_PERMISSIONS_VALUE"],
+            ),
+        )
         self.invite_perms.default = settings["invite_perms"]
         self.locale.default = settings["locale"]
         self.regional_format.default = settings["regional_format"]
 
     prefixes: wtforms.StringField = wtforms.StringField(
-        _("Prefixes:"), validators=[wtforms.validators.InputRequired(), PrefixesCheck()]
+        _("Prefixes:"), validators=[wtforms.validators.InputRequired(), PrefixesCheck()],
     )
     invoke_error_msg: wtforms.StringField = wtforms.StringField(
-        _("Invoke Error Message:"), validators=[wtforms.validators.Length(max=1000)]
+        _("Invoke Error Message:"), validators=[wtforms.validators.Length(max=1000)],
     )
     disabled_commands: wtforms.SelectMultipleField = wtforms.SelectMultipleField(
-        _("Disabled Commands:"), choices=[]
+        _("Disabled Commands:"), choices=[],
     )
     disabled_command_msg: wtforms.StringField = wtforms.StringField(_("Disabled Command Message"))
     description: wtforms.StringField = wtforms.StringField(
-        _("Description:"), validators=[wtforms.validators.Length(max=250)]
+        _("Description:"), validators=[wtforms.validators.Length(max=250)],
     )
     custom_info: MarkdownTextAreaField = MarkdownTextAreaField(
-        _("Custom Info:"), validators=[wtforms.validators.Length(max=1024)]
+        _("Custom Info:"), validators=[wtforms.validators.Length(max=1024)],
     )
     embeds: wtforms.BooleanField = wtforms.BooleanField(_("Use Embeds in commands responses."))
     color: wtforms.ColorField = wtforms.ColorField(_("Embeds Color:"))
-    fuzzy: wtforms.BooleanField = wtforms.BooleanField(_("Use Fuzzy Search when command invokation."))
+    fuzzy: wtforms.BooleanField = wtforms.BooleanField(
+        _("Use Fuzzy Search when command invokation."),
+    )
     use_buttons: wtforms.BooleanField = wtforms.BooleanField(_("Use Buttons instead of Reactions."))
     invite_public: wtforms.BooleanField = wtforms.BooleanField(_("Make the invite public."))
-    invite_commands_scope: wtforms.BooleanField = wtforms.BooleanField(_("Use the Commands Scope in the invite."))
+    invite_commands_scope: wtforms.BooleanField = wtforms.BooleanField(
+        _("Use the Commands Scope in the invite."),
+    )
     invite_perms: wtforms.IntegerField = wtforms.IntegerField(
         _("Invite Permissions (0 for nothing):"),
         validators=[
@@ -802,7 +872,7 @@ class BotSettingsForm(FlaskForm):
         ],
     )
     locale: wtforms.StringField = wtforms.StringField(
-        _("Locale:"), validators=[wtforms.validators.InputRequired(), BabelCheck()]
+        _("Locale:"), validators=[wtforms.validators.InputRequired(), BabelCheck()],
     )
     regional_format: wtforms.StringField = wtforms.StringField(
         _("Regional Format:"),
@@ -812,17 +882,27 @@ class BotSettingsForm(FlaskForm):
 
 
 class CustomPageForm(FlaskForm):
-    title: wtforms.StringField = wtforms.StringField(_("Title"), validators=[wtforms.validators.InputRequired(), wtforms.validators.Length(max=20)])
-    content: MarkdownTextAreaField = MarkdownTextAreaField(_("Content"), validators=[wtforms.validators.InputRequired(), wtforms.validators.Length(max=5000)])
+    title: wtforms.StringField = wtforms.StringField(
+        _("Title"),
+        validators=[wtforms.validators.InputRequired(), wtforms.validators.Length(max=20)],
+    )
+    content: MarkdownTextAreaField = MarkdownTextAreaField(
+        _("Content"),
+        validators=[wtforms.validators.InputRequired(), wtforms.validators.Length(max=5000)],
+    )
 
 
 class CustomPagesForm(FlaskForm):
-    def __init__(self, custom_pages: typing.Dict[str, str]) -> None:
+    def __init__(self, custom_pages: dict[str, str]) -> None:
         super().__init__(prefix="custom_pages_form_")
         for title, content in custom_pages.items():
             self.custom_pages.append_entry({"title": title, "content": content})
-        self.custom_pages.default = [entry for entry in self.custom_pages.entries if entry.csrf_token.data is None]
-        self.custom_pages.entries = [entry for entry in self.custom_pages.entries if entry.csrf_token.data is not None]
+        self.custom_pages.default = [
+            entry for entry in self.custom_pages.entries if entry.csrf_token.data is None
+        ]
+        self.custom_pages.entries = [
+            entry for entry in self.custom_pages.entries if entry.csrf_token.data is not None
+        ]
 
     custom_pages: wtforms.FieldList = wtforms.FieldList(wtforms.FormField(CustomPageForm))
     submit: wtforms.SubmitField = wtforms.SubmitField(_("Save Modifications"))
@@ -832,16 +912,16 @@ class CustomPagesForm(FlaskForm):
 @blueprint.route("/admin", methods=("GET", "POST"))
 @login_required
 async def admin(
-    page: typing.Optional[typing.Literal["overview", "dashboard-settings", "bot-settings", "custom_pages"]] = None
+    page: typing.Literal["overview", "dashboard-settings", "bot-settings", "custom_pages"] | None = None,
 ):
     if not current_user.is_authenticated or not current_user.is_owner:
         return abort(403, description=_("You're not a bot owner!"))
 
     uptime_str = humanize_timedelta(
-        timedelta=datetime.datetime.now(tz=datetime.timezone.utc) - app.config["LAUNCH"]
+        timedelta=datetime.datetime.now(tz=datetime.UTC) - app.config["LAUNCH"],
     )
     connection_str = humanize_timedelta(
-        timedelta=datetime.datetime.now(tz=datetime.timezone.utc) - app.config["LAST_RPC_EVENT"]
+        timedelta=datetime.datetime.now(tz=datetime.UTC) - app.config["LAST_RPC_EVENT"],
     )
 
     bot_profile_form: DiscordProfileForm = DiscordProfileForm()
@@ -869,7 +949,7 @@ async def admin(
                 flash(result["error"], category="danger")
             flash(_("Failed to save the modifications."), category="danger")
         return redirect(request.url)
-    elif bot_profile_form.submit.data and bot_profile_form.errors:
+    if bot_profile_form.submit.data and bot_profile_form.errors:
         for field_name, error_messages in bot_profile_form.errors.items():
             flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
@@ -885,13 +965,11 @@ async def admin(
                 flash(_("Dashboard unlocked."), category="success")
         elif dashboard_actions_form.refresh_sessions.data:
             User.USERS = {
-                user_id: user
-                for user_id, user in User.USERS.items()
-                if not user.is_owner
+                user_id: user for user_id, user in User.USERS.items() if not user.is_owner
             }
             flash(_("Users sessions refreshed."), category="success")
         return redirect(request.url)
-    elif dashboard_actions_form.lock.data and dashboard_actions_form.errors:
+    if dashboard_actions_form.lock.data and dashboard_actions_form.errors:
         for field_name, error_messages in dashboard_actions_form.errors.items():
             flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
@@ -903,7 +981,7 @@ async def admin(
     }
     dashboard_settings = await get_result(app, requeststr)
     dashboard_settings_form: DashboardSettingsForm = DashboardSettingsForm(
-        settings=dashboard_settings
+        settings=dashboard_settings,
     )
     if dashboard_settings_form.validate_on_submit():
         new_dashboard_settings = {
@@ -929,14 +1007,14 @@ async def admin(
         result = await get_result(app, requeststr)
         if result["status"] == 0:
             app.data["disabled_third_parties"] = new_dashboard_settings.pop(
-                "disabled_third_parties"
+                "disabled_third_parties",
             )
             app.data["ui"]["meta"].update(**new_dashboard_settings)
             flash(_("Successfully saved the modifications."), category="success")
         else:
             flash(_("Failed to save the modifications."), category="danger")
         return redirect(request.url)
-    elif dashboard_settings_form.submit.data and dashboard_settings_form.errors:
+    if dashboard_settings_form.submit.data and dashboard_settings_form.errors:
         for field_name, error_messages in dashboard_settings_form.errors.items():
             flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
@@ -956,7 +1034,11 @@ async def admin(
             "params": [
                 current_user.id,
                 {
-                    "prefixes": (prefixes if (prefixes := bot_settings_form.prefixes.data.split(";;|;;")) != [""] else []),
+                    "prefixes": (
+                        prefixes
+                        if (prefixes := bot_settings_form.prefixes.data.split(";;|;;")) != [""]
+                        else []
+                    ),
                     "invoke_error_msg": bot_settings_form.invoke_error_msg.data.strip() or None,
                     "disabled_commands": bot_settings_form.disabled_commands.data,
                     "disabled_command_msg": bot_settings_form.disabled_command_msg.data.strip()
@@ -981,7 +1063,7 @@ async def admin(
         else:
             flash(_("Failed to save the modifications."), category="danger")
         return redirect(request.url)
-    elif bot_settings_form.submit.data and bot_settings_form.errors:
+    if bot_settings_form.submit.data and bot_settings_form.errors:
         for field_name, error_messages in bot_settings_form.errors.items():
             flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
@@ -1012,18 +1094,22 @@ async def admin(
         else:
             flash(_("Failed to save the modifications."), category="danger")
         return redirect(request.url)
-    elif custom_pages_form.submit.data and custom_pages_form.errors:
+    if custom_pages_form.submit.data and custom_pages_form.errors:
         for field_name, error_messages in custom_pages_form.errors.items():
-            if isinstance(error_messages[0], typing.Dict):
+            if isinstance(error_messages[0], dict):
                 for sub_field_name, sub_error_messages in error_messages[0].items():
-                    flash(f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}", category="warning")
+                    flash(
+                        f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}",
+                        category="warning",
+                    )
                 continue
             flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
     return render_template(
         "pages/admin.html",
         page=page
-        if page is not None and page in ("overview", "dashboard-settings", "bot-settings", "custom-pages")
+        if page is not None
+        and page in ("overview", "dashboard-settings", "bot-settings", "custom-pages")
         else "overview",
         uptime_str=uptime_str,
         connection_str=connection_str,
@@ -1041,12 +1127,14 @@ class CogForm(FlaskForm):
 
 
 class CogsForm(FlaskForm):
-    def __init__(self, cogs: typing.Dict[str, bool]) -> None:
+    def __init__(self, cogs: dict[str, bool]) -> None:
         super().__init__(prefix="cogs_form_")
         for cog_name, loaded in cogs.items():
             self.cogs.append_entry({"cog_name": cog_name, "loaded": loaded})
         self.cogs.default = [entry for entry in self.cogs.entries if entry.csrf_token.data is None]
-        self.cogs.entries = [entry for entry in self.cogs.entries if entry.csrf_token.data is not None]
+        self.cogs.entries = [
+            entry for entry in self.cogs.entries if entry.csrf_token.data is not None
+        ]
 
     cogs: wtforms.FieldList = wtforms.FieldList(
         wtforms.FormField(CogForm),
@@ -1073,7 +1161,7 @@ class AddRepoForm(FlaskForm):
             wtforms.validators.Regexp(
                 r"^[a-zA-Z0-9_\-\.]+$",
                 message=_(
-                    "Repo names can only contain characters A-z, numbers, underscores, hyphens, and dots."
+                    "Repo names can only contain characters A-z, numbers, underscores, hyphens, and dots.",
                 ),
             ),
             wtforms.validators.Regexp(
@@ -1100,11 +1188,13 @@ class AddRepoForm(FlaskForm):
 
 
 class RepoActionsForm(FlaskForm):
-    def __init__(self, repo: typing.Dict[str, str]) -> None:
+    def __init__(self, repo: dict[str, str]) -> None:
         super().__init__(prefix=f"repo_actions_form_{repo['name']}_")
 
     update_repo: wtforms.SubmitField = wtforms.SubmitField(_("Update Repository"))
-    update_cogs_from_repo: wtforms.SubmitField = wtforms.SubmitField(_("Update Cogs from Repository"))
+    update_cogs_from_repo: wtforms.SubmitField = wtforms.SubmitField(
+        _("Update Cogs from Repository"),
+    )
     remove: wtforms.SubmitField = wtforms.SubmitField(_("Remove Repository"))
 
 
@@ -1133,7 +1223,7 @@ class ApplicationCommandForm(FlaskForm):
 
 
 class ApplicationCommandsForm(FlaskForm):
-    def __init__(self, application_commands: typing.Dict[str, typing.Any]) -> None:
+    def __init__(self, application_commands: dict[str, typing.Any]) -> None:
         super().__init__(prefix="application_commands_form_")
         for module, commands in application_commands.items():
             for command in commands:
@@ -1143,10 +1233,16 @@ class ApplicationCommandsForm(FlaskForm):
                         "ac_type": command["type"],
                         "ac_name": command["name"],
                         "enabled": command["enabled"],
-                    }
+                    },
                 )
-        self.application_commands.default = [entry for entry in self.application_commands.entries if entry.csrf_token.data is None]
-        self.application_commands.entries = [entry for entry in self.application_commands.entries if entry.csrf_token.data is not None]
+        self.application_commands.default = [
+            entry for entry in self.application_commands.entries if entry.csrf_token.data is None
+        ]
+        self.application_commands.entries = [
+            entry
+            for entry in self.application_commands.entries
+            if entry.csrf_token.data is not None
+        ]
 
     application_commands: wtforms.FieldList = wtforms.FieldList(
         wtforms.FormField(ApplicationCommandForm),
@@ -1173,7 +1269,11 @@ async def cog_management_downloader():
     update_repos_cogs_form: UpdateReposCogsForm = UpdateReposCogsForm()
     if not repos:
         update_repos_cogs_form.update_repos.render_kw = {"disabled": True}
-    if not any(available_cog["installed"] for repo in repos for available_cog in repo["available_cogs"].values()):
+    if not any(
+        available_cog["installed"]
+        for repo in repos
+        for available_cog in repo["available_cogs"].values()
+    ):
         update_repos_cogs_form.update_cogs.render_kw = {"disabled": True}
     if update_repos_cogs_form.update_repos.data or update_repos_cogs_form.update_cogs.data:
         if update_repos_cogs_form.validate_on_submit():
@@ -1199,7 +1299,7 @@ async def cog_management_downloader():
             for notification in result["notifications"]:
                 flash(**notification)
             raise RuntimeWarning()
-        elif update_repos_cogs_form.errors:
+        if update_repos_cogs_form.errors:
             for field_name, error_messages in update_repos_cogs_form.errors.items():
                 flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
@@ -1220,14 +1320,11 @@ async def cog_management_downloader():
         for notification in result["notifications"]:
             flash(**notification)
         raise RuntimeWarning()
-    elif add_repo_form.submit.data and add_repo_form.errors:
+    if add_repo_form.submit.data and add_repo_form.errors:
         for field_name, error_messages in add_repo_form.errors.items():
             flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
-    repos_actions_forms = {
-        r["name"]: RepoActionsForm(r)
-        for r in repos
-    }
+    repos_actions_forms = {r["name"]: RepoActionsForm(r) for r in repos}
     for repo_name, repo_actions_form in repos_actions_forms.items():
         if (
             repo_actions_form.update_repo.data
@@ -1269,15 +1366,12 @@ async def cog_management_downloader():
                 for notification in result["notifications"]:
                     flash(**notification)
                 raise RuntimeWarning()
-            elif repo_actions_form.errors:
+            if repo_actions_form.errors:
                 for field_name, error_messages in repo_actions_form.errors.items():
                     flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
     cogs_actions_forms = {
-        r["name"]: {
-        cog_name: CogActionsForm(cog_name)
-        for cog_name in r["available_cogs"]
-        }
+        r["name"]: {cog_name: CogActionsForm(cog_name) for cog_name in r["available_cogs"]}
         for r in repos
     }
     for repo_name, available_cogs in cogs_actions_forms.items():
@@ -1296,13 +1390,13 @@ async def cog_management_downloader():
                             "DASHBOARDRPC_COGMANAGEMENT__INSTALL_COG"
                             if cog_actions_form.install.data
                             else (
-                            "DASHBOARDRPC_COGMANAGEMENT__UPDATE_COG"
-                            if cog_actions_form.update.data
-                            else (
-                                "DASHBOARDRPC_COGMANAGEMENT__PIN_OR_UNPIN_COG"
-                                if cog_actions_form.pin_or_unpin.data
-                                else "DASHBOARDRPC_COGMANAGEMENT__UNINSTALL_COG"
-                            )
+                                "DASHBOARDRPC_COGMANAGEMENT__UPDATE_COG"
+                                if cog_actions_form.update.data
+                                else (
+                                    "DASHBOARDRPC_COGMANAGEMENT__PIN_OR_UNPIN_COG"
+                                    if cog_actions_form.pin_or_unpin.data
+                                    else "DASHBOARDRPC_COGMANAGEMENT__UNINSTALL_COG"
+                                )
                             )
                         ),
                         "params": [
@@ -1315,7 +1409,7 @@ async def cog_management_downloader():
                     for notification in result["notifications"]:
                         flash(**notification)
                     raise RuntimeWarning()
-                elif cog_actions_form.errors:
+                if cog_actions_form.errors:
                     for field_name, error_messages in cog_actions_form.errors.items():
                         flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
@@ -1335,8 +1429,8 @@ async def cog_management_downloader():
 @blueprint.route("/cog-management", methods=("GET", "POST"))
 @login_required
 async def cog_management(
-    page: typing.Optional[typing.Literal["cogs", "downloader", "slash"]] = None,
-    repo: typing.Optional[str] = None,
+    page: typing.Literal["cogs", "downloader", "slash"] | None = None,
+    repo: str | None = None,
 ):
     if not current_user.is_authenticated or not current_user.is_owner:
         return abort(403, description=_("You're not a bot owner!"))
@@ -1366,11 +1460,14 @@ async def cog_management(
             for notification in result["notifications"]:
                 flash(**notification)
             return redirect(request.url)
-        elif cogs_form.errors:
+        if cogs_form.errors:
             for field_name, error_messages in cogs_form.errors.items():
-                if isinstance(error_messages[0], typing.Dict):
+                if isinstance(error_messages[0], dict):
                     for sub_field_name, sub_error_messages in error_messages[0].items():
-                        flash(f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}", category="warning")
+                        flash(
+                            f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}",
+                            category="warning",
+                        )
                     continue
                 flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
 
@@ -1409,7 +1506,7 @@ async def cog_management(
             for notification in result["notifications"]:
                 flash(**notification)
             return redirect(request.url)
-        elif sync_application_commands_form.errors:
+        if sync_application_commands_form.errors:
             for field_name, error_messages in sync_application_commands_form.errors.items():
                 flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
     if application_commands:
@@ -1422,7 +1519,8 @@ async def cog_management(
                     for application_command in application_commands[module]:
                         if (
                             entry := next(
-                                entry for entry in application_commands_form.application_commands.data
+                                entry
+                                for entry in application_commands_form.application_commands.data
                                 if (
                                     entry["module"] == module
                                     and entry["ac_type"] == application_command["type"]
@@ -1444,11 +1542,14 @@ async def cog_management(
                 for notification in result["notifications"]:
                     flash(**notification)
                 return redirect(request.url)
-            elif application_commands_form.errors:
+            if application_commands_form.errors:
                 for field_name, error_messages in application_commands_form.errors.items():
-                    if isinstance(error_messages[0], typing.Dict):
+                    if isinstance(error_messages[0], dict):
                         for sub_field_name, sub_error_messages in error_messages[0].items():
-                            flash(f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}", category="warning")
+                            flash(
+                                f"{field_name}-{sub_field_name}: {' '.join(sub_error_messages)}",
+                                category="warning",
+                            )
                         continue
                     flash(f"{field_name}: {' '.join(error_messages)}", category="warning")
         all_sub_enabled = {
@@ -1469,9 +1570,7 @@ async def cog_management(
         cogs_number=len(cogs),
         cogs_form=cogs_form,
         downloader_loaded=downloader_loaded,
-        tab_name=repo if repo is not None and repo in repo_names
-        else
-        None,
+        tab_name=repo if repo is not None and repo in repo_names else None,
         application_commands_number=sum(len(v) for v in application_commands.values()),
         sync_application_commands_form=sync_application_commands_form,
         application_commands_form=application_commands_form,

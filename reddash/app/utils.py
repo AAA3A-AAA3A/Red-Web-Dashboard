@@ -9,6 +9,7 @@ from copy import deepcopy
 from importlib import import_module
 from urllib.parse import parse_qs, quote_plus, urlencode, urlparse, urlunparse
 
+import bleach
 import jwt
 import websocket
 from django.conf import settings
@@ -23,19 +24,18 @@ from flask_sitemapper import Sitemapper
 from flask_talisman import Talisman
 from flask_wtf.csrf import CSRFProtect
 from flask_wtf.file import FileAllowed, FileField, MultipleFileField
-from wtforms import Field, SelectFieldBase, FormField
 from fuzzywuzzy import process
 from markdown import Markdown
+from markupsafe import Markup
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import Python3TracebackLexer, get_lexer_by_name
-import bleach
-from markupsafe import Markup
+from wtforms import Field, FormField, SelectFieldBase
 
 settings.configure()
 from django_user_agents.utils import get_user_agent
 
-AVAILABLE_COLORS: typing.List[str] = [
+AVAILABLE_COLORS: list[str] = [
     "success",
     "warning",
     "danger",
@@ -58,28 +58,26 @@ WS_EXCEPTIONS = (
 
 
 class User(UserMixin):
-    USERS: typing.Dict[str, "User"] = {}
+    USERS: dict[str, "User"] = {}
 
     def __init__(
         self,
         id: int,
         name: str,
-        global_name: typing.Optional[str] = None,
-        avatar_url: typing.Optional[str] = None,
+        global_name: str | None = None,
+        avatar_url: str | None = None,
     ) -> None:
         self.id: int = id
         self.name: str = name
-        self.global_name: typing.Optional[str] = global_name
-        self.avatar_url: typing.Optional[str] = avatar_url
+        self.global_name: str | None = global_name
+        self.avatar_url: str | None = avatar_url
 
-        self.devices: typing.List[str] = []
+        self.devices: list[str] = []
 
         self.__class__.USERS[self.id] = self
 
     def get_id(self) -> str:
-        token = self.generate_token(
-            action="login", expiration_timedelta=datetime.timedelta(days=1)
-        )
+        token = self.generate_token(action="login", expiration_timedelta=datetime.timedelta(days=1))
         self.devices.append(token)
         try:
             self.devices.remove(session["_user_id"])
@@ -96,7 +94,9 @@ class User(UserMixin):
 
     @property
     def display_avatar(self) -> str:
-        return self.avatar_url or f"https://cdn.discordapp.com/embed/avatars/{(self.id >> 22) % 6}.png"
+        return (
+            self.avatar_url or f"https://cdn.discordapp.com/embed/avatars/{(self.id >> 22) % 6}.png"
+        )
 
     @property
     def is_owner(self) -> bool:
@@ -112,12 +112,12 @@ class User(UserMixin):
 
     def generate_token(
         self,
-        action: typing.Optional[str] = None,
+        action: str | None = None,
         expiration_timedelta: datetime.timedelta = datetime.timedelta(minutes=15),
-        data: typing.Dict[str, typing.Any] = {},
+        data: dict[str, typing.Any] = {},
     ) -> str:
         secret_key = app.config["SECRET_KEY"]
-        expiration_time = datetime.datetime.now(tz=datetime.timezone.utc) + expiration_timedelta
+        expiration_time = datetime.datetime.now(tz=datetime.UTC) + expiration_timedelta
         payload = {
             "user_id": self.id,
             "action": action,
@@ -130,10 +130,10 @@ class User(UserMixin):
     def get_user_from_token(
         cls,
         token: str,
-        action: typing.Optional[str] = None,
+        action: str | None = None,
         unique: bool = True,
         return_data: bool = False,
-    ) -> typing.Union["User", typing.Tuple["User", typing.Dict[str, typing.Any]]]:
+    ) -> typing.Union["User", tuple["User", dict[str, typing.Any]]]:
         secret_key = app.config["SECRET_KEY"]
         try:
             data = jwt.decode(token, secret_key, algorithms=["HS256"])
@@ -163,12 +163,12 @@ def register_extensions(_app: Flask) -> None:
     app.config["USE_SESSION_FOR_NEXT"]: bool = False
     app.login_manager.login_view: str = "login_blueprint.login"
     app.login_manager.login_message: str = _(
-        "Please log in to access this page."
+        "Please log in to access this page.",
     )  # Just to have the string in the translation files...
     app.login_manager.login_message_category: str = "info"
     app.login_manager.refresh_view: str = "login_blueprint.login"
     app.login_manager.needs_refresh_message: str = _(
-        "To protect your account, please reauthenticate to access this page."
+        "To protect your account, please reauthenticate to access this page.",
     )  # Just to have the string in the translation files...
     app.login_manager.needs_refresh_message_category: str = "info"
     app.login_manager.localize_callback: typing.Any = _
@@ -179,15 +179,15 @@ def register_extensions(_app: Flask) -> None:
         try:
             user: User = User.get_user_from_token(token=token, action="login", unique=False)
         except jwt.ExpiredSignatureError:
-            return
+            return None
         except jwt.InvalidTokenError:
             remote_addr = request.environ.get("HTTP_X_FORWARDED_FOR", request.remote_addr)
             if remote_addr in app.data["core"]["blacklisted_ips"]:
-                return
+                return None
             # app.data["core"]["blacklisted_ips"].append(remote_addr)
-            return
+            return None
         if not user.is_active or token not in user.devices:
-            return
+            return None
         return user
 
     # https://github.com/GoogleCloudPlatform/flask-talisman
@@ -196,23 +196,28 @@ def register_extensions(_app: Flask) -> None:
 
     def _force_https():
         if request.remote_addr in ("127.0.0.1", "::1"):
-            return
+            return None
         private_ip_ranges = [
             ("10.0.0.0", "10.255.255.255"),
             ("172.16.0.0", "172.31.255.255"),
             ("192.168.0.0", "192.168.255.255"),
         ]
         if any(start <= request.remote_addr <= end for start, end in private_ip_ranges):
-            return
+            return None
         return old_force_https()
 
     app.talisman._force_https = _force_https
     allow_unsecure_http_requests = app.data["core"]["allow_unsecure_http_requests"]
-    app.talisman.init_app(app, force_https=not allow_unsecure_http_requests, session_cookie_secure=not allow_unsecure_http_requests, content_security_policy=None)
+    app.talisman.init_app(
+        app,
+        force_https=not allow_unsecure_http_requests,
+        session_cookie_secure=not allow_unsecure_http_requests,
+        content_security_policy=None,
+    )
 
     app.config["WTF_CSRF_ENABLED"]: bool = True
     app.config["WTF_CSRF_SECRET_KEY"]: str = base64.urlsafe_b64decode(
-        Fernet.generate_key().decode()
+        Fernet.generate_key().decode(),
     )
     app.csrf_protect: CSRFProtect = CSRFProtect()
     app.csrf_protect.init_app(app)
@@ -231,10 +236,13 @@ def register_extensions(_app: Flask) -> None:
             return
         if hasattr(field, "_value"):
             field._real_value = field._value
-        field._value = lambda: (field._real_value() if hasattr(field, "_real_value") else "") or (
-            (field.default if isinstance(field.default, typing.List) else str(field.default))
-            if field.default is not None
-            else ""
+        field._value = lambda: (
+            (field._real_value() if hasattr(field, "_real_value") else "")
+            or (
+                (field.default if isinstance(field.default, list) else str(field.default))
+                if field.default is not None
+                else ""
+            )
         )
         if isinstance(field, SelectFieldBase):
             old_choices_generator = field._choices_generator
@@ -247,7 +255,7 @@ def register_extensions(_app: Flask) -> None:
                         selected
                         or (
                             field.coerce(value) == field._value()
-                            if not isinstance(field._value(), typing.List)
+                            if not isinstance(field._value(), list)
                             else field.coerce(value) in field._value()
                         ),
                         render_kw,
@@ -266,7 +274,7 @@ def register_extensions(_app: Flask) -> None:
                 )
             ) is not None:
                 field.flags.accept = ", ".join(
-                    [f".{extension}" for extension in file_allowed.upload_set]
+                    [f".{extension}" for extension in file_allowed.upload_set],
                 )
 
     Field.__init__ = init_field
@@ -328,15 +336,12 @@ def register_blueprints(app: Flask) -> None:
         #     return render_template("errors/404.html"), 404
         remote_addr = request.environ.get("HTTP_X_FORWARDED_FOR", request.remote_addr)
         if request.path.startswith(("/static", "/api/stream", "/blacklisted")):
-            return
+            return None
         if remote_addr in app.data["core"]["blacklisted_ips"]:
             return redirect(url_for("login_blueprint.blacklisted"))
         if (
             app.locked
-            and (
-                not current_user.is_authenticated
-                or not current_user.is_owner
-            )
+            and (not current_user.is_authenticated or not current_user.is_owner)
             and not request.path.startswith("/static")
             and request.blueprint != "login_blueprint"
             and request.endpoint
@@ -350,16 +355,17 @@ def register_blueprints(app: Flask) -> None:
         ):
             flash(_("The Dashboard is currently locked."), category="danger")
             return redirect(url_for("base_blueprint.index", next=request.url))
+        return None
 
 
 def apply_themes(app: Flask) -> None:
     @app.context_processor
-    def override_url_for() -> typing.Dict[str, str]:
-        return dict(url_for=_generate_url_for_theme)
+    def override_url_for() -> dict[str, str]:
+        return {"url_for": _generate_url_for_theme}
 
     def _generate_url_for_theme(endpoint, **values) -> str:
         if endpoint.endswith("static"):
-            themename = values.get("theme", None) or app.config.get("DEFAULT_THEME", None)
+            themename = values.get("theme") or app.config.get("DEFAULT_THEME", None)
             if themename:
                 theme_file = "{}/{}".format(themename, values.get("filename", ""))
                 if os.path.isfile(os.path.join(app.static_folder, theme_file)):
@@ -374,17 +380,18 @@ def add_constants(app: Flask) -> None:
     default_color = app.data["ui"]["meta"]["default_color"]
     AVAILABLE_COLORS.remove(default_color)
     AVAILABLE_COLORS.insert(0, default_color)
-    def process_meta_tags() -> typing.Dict[str, typing.Any]:
+
+    def process_meta_tags() -> dict[str, typing.Any]:
         meta = deepcopy(app.data["ui"]["meta"])
         meta["color"] = request.cookies.get("color", meta["default_color"])
-        meta["available_colors"]: typing.List[str] = AVAILABLE_COLORS
+        meta["available_colors"]: list[str] = AVAILABLE_COLORS
         meta["background_theme"] = request.cookies.get(
-            "background_theme", meta["default_background_theme"]
+            "background_theme", meta["default_background_theme"],
         )
         meta["sidenav_theme"] = request.cookies.get("sidenav_theme", meta["default_sidenav_theme"])
         return {"meta": meta}
 
-    def process_sidenav() -> typing.List[typing.Dict]:
+    def process_sidenav() -> list[dict]:
         sidenav = sorted(app.data["ui"]["sidenav"], key=lambda x: x["pos"])
         final = []
         for item in sidenav:
@@ -430,7 +437,11 @@ def add_constants(app: Flask) -> None:
 
         if app.data["custom_pages"]:
             index = next(
-                (index for index, item in enumerate(final) if item["route"] == "base_blueprint.credits"),
+                (
+                    index
+                    for index, item in enumerate(final)
+                    if item["route"] == "base_blueprint.credits"
+                ),
                 None,
             )
             for custom_page in app.data["custom_pages"]:
@@ -443,14 +454,15 @@ def add_constants(app: Flask) -> None:
                     "locked": False,
                     "hidden": False,
                     "url": url_for("base_blueprint.custom_page", page_url=custom_page["url"]),
-                    "active": request.endpoint == "base_blueprint.custom_page" and request.view_args.get("page_url") == custom_page["url"],
+                    "active": request.endpoint == "base_blueprint.custom_page"
+                    and request.view_args.get("page_url") == custom_page["url"],
                 }
                 final.insert(index, custom_page)
                 index += 1
-        
+
         return final
 
-    def url_for_query(_anchor: typing.Optional[str] = None, **kwargs) -> Markup:
+    def url_for_query(_anchor: str | None = None, **kwargs) -> Markup:
         full_url = request.url
         url_components = urlparse(full_url)
         query_params = parse_qs(url_components.query)
@@ -460,12 +472,14 @@ def add_constants(app: Flask) -> None:
                 del query_params[kwarg]
         new_query_params = {k: v if isinstance(v, str) else v for k, v in query_params.items()}
         new_query_string = urlencode(new_query_params, doseq=True, quote_via=quote_plus).replace(
-            "amp%3B", ""
+            "amp%3B", "",
         )
         updated_url_components = url_components._replace(query=new_query_string)
         if _anchor is not None:
             updated_url_components = updated_url_components._replace(fragment=_anchor)
-        relative_url = urlunparse(updated_url_components._replace(scheme="", netloc="", params="", fragment=""))
+        relative_url = urlunparse(
+            updated_url_components._replace(scheme="", netloc="", params="", fragment=""),
+        )
         return Markup(relative_url)
 
     def number_to_text_with_suffix(number: float) -> str:
@@ -501,32 +515,34 @@ def add_constants(app: Flask) -> None:
         # return f"{number:.1f}{suffixes[index] if index is not None else ''}"
         if number == int(number):
             formatted_number = int(number)
-        elif f'{number:.1f}' != "0.0":
-            formatted_number = int(float(f"{number:.1f}")) if float(f"{number:.1f}") == int(float(f"{number:.1f}")) else f"{number:.1f}"
+        elif f"{number:.1f}" != "0.0":
+            formatted_number = (
+                int(float(f"{number:.1f}"))
+                if float(f"{number:.1f}") == int(float(f"{number:.1f}"))
+                else f"{number:.1f}"
+            )
         else:
-            formatted_number = int(float(f"{number:.2f}")) if float(f"{number:.2f}") == int(float(f"{number:.2f}")) else f"{number:.2f}"
+            formatted_number = (
+                int(float(f"{number:.2f}"))
+                if float(f"{number:.2f}") == int(float(f"{number:.2f}"))
+                else f"{number:.2f}"
+            )
         suffix = suffixes[index] if index is not None else ""
         return f"{formatted_number}{suffix}"
 
     @app.context_processor
-    def inject_variables() -> typing.Dict[str, typing.Any]:
+    def inject_variables() -> dict[str, typing.Any]:
         variables = deepcopy(app.variables)
         variables["locales"] = app.config["LOCALE_DICT"]
         variables["safelocales"] = json.dumps(app.config["LOCALE_DICT"])
         variables["selectedlocale"] = session.get("lang_code")
         variables["sidenav"] = process_sidenav()
-        uptime = datetime.datetime.fromtimestamp(
-            app.variables["stats"]["uptime"]
-        )
+        uptime = datetime.datetime.fromtimestamp(app.variables["stats"]["uptime"])
         utc_now = datetime.datetime.utcnow().replace(second=0, microsecond=0)
         real_timedelta = utc_now - uptime
         timedelta: datetime.timedelta = utc_now - uptime.replace(
-            hour=utc_now.hour
-            if real_timedelta > datetime.timedelta(days=30)
-            else uptime.hour,
-            minute=utc_now.minute
-            if real_timedelta > datetime.timedelta(days=1)
-            else uptime.minute,
+            hour=utc_now.hour if real_timedelta > datetime.timedelta(days=30) else uptime.hour,
+            minute=utc_now.minute if real_timedelta > datetime.timedelta(days=1) else uptime.minute,
             second=0,
             microsecond=0,
         )
@@ -534,21 +550,20 @@ def add_constants(app: Flask) -> None:
             timedelta = datetime.timedelta(days=timedelta.days // 30 * 30)
         variables["stats"]["uptime_timedelta"] = humanize_timedelta(timedelta=timedelta)
         variables.update(**process_meta_tags())
-        return dict(
-            version="1.0",
-            variables=variables,
-            full_login_url=make_login_url(app.login_manager.login_view, next_url=request.url)
-            if request.endpoint != "base_blueprint.index"
-            and request.blueprint != "login_blueprint"
+        return {
+            "version": "1.0",
+            "variables": variables,
+            "full_login_url": make_login_url(app.login_manager.login_view, next_url=request.url)
+            if request.endpoint != "base_blueprint.index" and request.blueprint != "login_blueprint"
             else url_for(app.login_manager.login_view),
-            url_for_query=url_for_query,
-            number_to_text_with_suffix=number_to_text_with_suffix,
-        )
+            "url_for_query": url_for_query,
+            "number_to_text_with_suffix": number_to_text_with_suffix,
+        }
 
 
 def initialize_babel(app: Flask) -> None:
     app.config["BABEL_TRANSLATION_DIRECTORIES"]: str = "translations"
-    app.config["LANGUAGES"]: typing.List[str] = [
+    app.config["LANGUAGES"]: list[str] = [
         "en-US",
         "af-ZA",
         "ar-SA",
@@ -583,14 +598,14 @@ def initialize_babel(app: Flask) -> None:
         "zh-HK",
         "zh-TW",
     ]
-    locale_dict: typing.Dict[str, str] = {}
+    locale_dict: dict[str, str] = {}
     for locale in app.config["LANGUAGES"]:
         loc = Locale.parse(locale, sep="-")
         lang = loc.get_language_name()
         if territory := loc.get_territory_name():
             lang = f"{lang} - {territory}"
         locale_dict[locale] = lang
-    app.config["LOCALE_DICT"]: typing.Dict[str, str] = locale_dict
+    app.config["LOCALE_DICT"]: dict[str, str] = locale_dict
 
     @app.before_request
     def pull_locale() -> None:
@@ -601,9 +616,11 @@ def initialize_babel(app: Flask) -> None:
         # - default from browser
         locale = None
         lang = request.args.get("lang_code") or request.cookies.get(
-            "lang_code"
+            "lang_code",
         )  # Url is visible by user, so it's the priority.
-        lang = lang or session.get("lang_code")  # User either didn't have `lang_code` argument or wasnt able to match a locale. Let's check if theres something in the session.
+        lang = (
+            lang or session.get("lang_code")
+        )  # User either didn't have `lang_code` argument or wasnt able to match a locale. Let's check if theres something in the session.
         if lang:
             # User had `lang_code` argument in request, lets check if its valid.
             processed = process.extractOne(lang, app.config["LANGUAGES"])
@@ -619,7 +636,8 @@ def initialize_babel(app: Flask) -> None:
     # @app.babel.localeselector
     def get_locale() -> str:
         return (
-            session.get("lang_code") or request.accept_languages.best_match(app.config["LANGUAGES"], default="en-US")
+            session.get("lang_code")
+            or request.accept_languages.best_match(app.config["LANGUAGES"], default="en-US")
         ).replace("-", "_")
 
     app.extensions["babel"].locale_selector = get_locale
@@ -637,10 +655,10 @@ def initialize_websocket(app: Flask) -> bool:
     return True
 
 
-def check_for_disconnect(app: Flask, result: typing.Dict[str, typing.Any]) -> bool:
+def check_for_disconnect(app: Flask, result: dict[str, typing.Any]) -> bool:
     if (
         "error" in result
-        and isinstance(result["error"], typing.Dict)
+        and isinstance(result["error"], dict)
         and result["error"]["message"] == "Method not found"
         or result.get("disconnected", False)
     ):
@@ -652,9 +670,12 @@ def check_for_disconnect(app: Flask, result: typing.Dict[str, typing.Any]) -> bo
     return True
 
 
-async def get_result(app: Flask, request: typing.Dict[str, typing.Any], *, retry: bool = True) -> typing.Dict[str, typing.Any]:
+async def get_result(
+    app: Flask, request: dict[str, typing.Any], *, retry: bool = True,
+) -> dict[str, typing.Any]:
     if app.cog is not None:
         from aiohttp_json_rpc.protocol import JsonRpcMsg, JsonRpcMsgTyp
+
         try:
             method = app.cog.bot.rpc._rpc.methods[request["method"]]
         except KeyError:
@@ -681,7 +702,11 @@ async def get_result(app: Flask, request: typing.Dict[str, typing.Any], *, retry
             return {"status": 1, "error": _("Not connected to bot.")}
         app.logger.error(result["error"])
         return {"status": 1, "error": _("Something went wrong.")}
-    if not result["result"] or isinstance(result["result"], typing.Dict) and result["result"].get("disconnected", False):
+    if (
+        not result["result"]
+        or isinstance(result["result"], dict)
+        and result["result"].get("disconnected", False)
+    ):
         return {"status": 1, "error": _("Not connected to bot.")}
     return result["result"]
 
@@ -705,7 +730,7 @@ def notify_owner_of_blacklist(app: Flask, ip: str) -> None:
 
 # This is taken from Red-DiscordBot's `chat_formatting.py` (https://github.com/Cog-Creators/Red-DiscordBot/blob/V3/develop/redbot/core/utils/chat_formatting.py#L521-L574).
 def humanize_timedelta(
-    *, timedelta: typing.Optional[datetime.timedelta] = None, seconds: typing.Optional[int] = None
+    *, timedelta: datetime.timedelta | None = None, seconds: int | None = None,
 ) -> str:
     """
     Get a locale aware human timedelta representation.

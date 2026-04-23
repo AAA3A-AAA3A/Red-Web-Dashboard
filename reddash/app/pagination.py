@@ -3,7 +3,7 @@ import typing  # isort:skip
 from markupsafe import Markup
 
 
-class Pagination(typing.List):
+class Pagination(list):
     """Pagination system for lists."""
 
     DEFAULT_PER_PAGE: int = 20
@@ -18,7 +18,7 @@ class Pagination(typing.List):
         self.default_page: int = kwargs.pop("default_page", 1)
         super().__init__(*args, **kwargs)
 
-    def to_dict(self) -> typing.Dict[str, typing.Any]:
+    def to_dict(self) -> dict[str, typing.Any]:
         return {
             "items": list(self),
             "total": self.total,
@@ -39,19 +39,19 @@ class Pagination(typing.List):
         return self.page < self.pages
 
     @property
-    def elements_numbers(self) -> typing.List[int]:
+    def elements_numbers(self) -> list[int]:
         return list(range(1, self.total + 1))
 
     @property
-    def pages_numbers(self) -> typing.List[int]:
+    def pages_numbers(self) -> list[int]:
         return list(range(1, self.pages + 1))
 
     @classmethod
     def from_list(
         cls,
-        items: typing.List[typing.Any],
-        per_page: typing.Optional[typing.Union[int, str]] = None,
-        page: typing.Optional[typing.Union[int, str]] = None,
+        items: list[typing.Any],
+        per_page: int | str | None = None,
+        page: int | str | None = None,
         default_per_page: int = DEFAULT_PER_PAGE,
         default_page: int = DEFAULT_PAGE,
     ) -> typing.Any:
@@ -60,14 +60,20 @@ class Pagination(typing.List):
             if per_page is None
             else (
                 int(per_page)
-                if isinstance(per_page, str) and per_page.isdigit() and 1 <= int(per_page) <= max(default_per_page * 5, 100)
+                if isinstance(per_page, str)
+                and per_page.isdigit()
+                and 1 <= int(per_page) <= max(default_per_page * 5, 100)
                 else default_per_page
             )
         )
         page = (
             default_page
             if page is None
-            else (int(page) if isinstance(page, str) and page.isdigit() and int(page) >= 1 else default_page)
+            else (
+                int(page)
+                if isinstance(page, str) and page.isdigit() and int(page) >= 1
+                else default_page
+            )
         )
         total = len(items)
         pages = (total // per_page) + (total % per_page > 0)
@@ -84,7 +90,12 @@ class Pagination(typing.List):
             default_page=default_page,
         )
 
-    def to_html(self, KEY: str = "pagination", custom_kwargs: bool = False, render_template_string: bool = True) -> Markup:
+    def to_html(
+        self,
+        KEY: str = "pagination",
+        custom_kwargs: bool = False,
+        render_template_string: bool = True,
+    ) -> Markup:
         html = """<br />
         <div id="KEY-pagination"></div>
         <script>
@@ -134,4 +145,5 @@ class Pagination(typing.List):
         if not render_template_string:
             return html
         from flask import render_template_string
+
         return Markup(render_template_string(html, **{KEY: self}))

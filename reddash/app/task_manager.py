@@ -2,7 +2,6 @@
 The base of the RPC management has been done by Neuro Assassin (https://github.com/Cog-Creators/Red-Dashboard)!
 """
 
-import typing  # isort:skip
 
 import asyncio
 import datetime
@@ -10,18 +9,18 @@ import threading
 
 from flask import Flask
 
-from .utils import check_for_disconnect, initialize_websocket, get_result
+from .utils import check_for_disconnect, get_result, initialize_websocket
 
 
 class TaskManager:
     def __init__(self, app: Flask) -> None:
         self.app: Flask = app
 
-        self.threads: typing.List[typing.Union[threading.Thread, asyncio.Task]] = []
+        self.threads: list[threading.Thread | asyncio.Task] = []
         self.ignore_disconnect = False
 
     async def update_data_variables(
-        self, method: str, once: bool = True, only_bot_variables: bool = False
+        self, method: str, once: bool = True, only_bot_variables: bool = False,
     ) -> None:
         try:
             while True:
@@ -32,7 +31,9 @@ class TaskManager:
                     "jsonrpc": "2.0",
                     "id": 0,
                     "method": method,
-                    "params": [only_bot_variables, [self.app.host, self.app.port]] if method == "DASHBOARDRPC__GET_VARIABLES" else [],
+                    "params": [only_bot_variables, [self.app.host, self.app.port]]
+                    if method == "DASHBOARDRPC__GET_VARIABLES"
+                    else [],
                 }
                 if self.app.cog is None:
                     # This needs to be inside the lock, or both threads will create a websocket.
@@ -62,7 +63,7 @@ class TaskManager:
                 elif method == "DASHBOARDRPC__GET_VARIABLES":
                     if not self.app.variables:
                         self.app.logger.info(
-                            "Initial connection made with Red bot. Syncing data..."
+                            "Initial connection made with Red bot. Syncing data...",
                         )
                     self.app.variables.update(**result)
 
@@ -105,7 +106,7 @@ class TaskManager:
                     version = result["version"]
         except Exception as e:
             self.app.logger.exception(
-                "Background task `DASHBOARDRPC__CHECK_VERSION` died unexpectedly.", exc_info=e
+                "Background task `DASHBOARDRPC__CHECK_VERSION` died unexpectedly.", exc_info=e,
             )
 
     async def check_if_connected(self) -> None:
@@ -127,7 +128,7 @@ class TaskManager:
                 if last_state_disconnected:
                     self.app.logger.info("Reconnected to RPC Websocket.")
                     self.app.config["LAST_RPC_EVENT"]: datetime.datetime = datetime.datetime.now(
-                        tz=datetime.timezone.utc
+                        tz=datetime.UTC,
                     )
                     last_state_disconnected = False
             elif not last_state_disconnected:
@@ -135,7 +136,7 @@ class TaskManager:
                 self.app.config["RPC_CONNECTED"]: bool = False
                 last_state_disconnected = True
                 self.app.config["LAST_RPC_EVENT"]: datetime.datetime = datetime.datetime.now(
-                    tz=datetime.timezone.utc
+                    tz=datetime.UTC,
                 )
                 if self.app.ws:
                     self.app.ws.close()
@@ -148,41 +149,41 @@ class TaskManager:
                     target=asyncio.run,
                     args=[self.update_data_variables("DASHBOARDRPC__GET_DATA", once=False)],
                     daemon=True,
-                )
+                ),
             )
             self.threads.append(
                 threading.Thread(
                     target=asyncio.run,
                     args=[self.update_data_variables("DASHBOARDRPC__GET_VARIABLES", once=False)],
                     daemon=True,
-                )
+                ),
             )
             self.threads.append(
                 threading.Thread(
                     target=asyncio.run,
                     args=[self.update_version()],
                     daemon=True,
-                )
+                ),
             )
             self.threads.append(
                 threading.Thread(
                     target=asyncio.run,
                     args=[self.check_if_connected()],
                     daemon=True,
-                )
+                ),
             )
             for t in self.threads:
                 t.start()
         else:
             self.threads.append(
                 self.app.cog.bot.loop.create_task(
-                    self.update_data_variables("DASHBOARDRPC__GET_DATA", once=False)
-                )
+                    self.update_data_variables("DASHBOARDRPC__GET_DATA", once=False),
+                ),
             )
             self.threads.append(
                 self.app.cog.bot.loop.create_task(
-                    self.update_data_variables("DASHBOARDRPC__GET_VARIABLES", once=False)
-                )
+                    self.update_data_variables("DASHBOARDRPC__GET_VARIABLES", once=False),
+                ),
             )
 
     def stop_tasks(self) -> None:
