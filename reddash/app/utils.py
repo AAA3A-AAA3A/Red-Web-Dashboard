@@ -223,8 +223,8 @@ def register_extensions(_app: Flask) -> None:
     app.csrf_protect.init_app(app)
     initial_protect = app.csrf_protect.protect
 
-    def protect():
-        initial_protect()
+    def protect(*args, **kwargs):
+        initial_protect(*args, **kwargs)
         g.csrf_valid = False
 
     app.csrf_protect.protect = protect
