@@ -1443,7 +1443,14 @@ async def cog_management(
         "method": "DASHBOARDRPC_COGMANAGEMENT__GET_COGS",
         "params": [current_user.id],
     }
-    cogs = (await get_result(app, requeststr))["cogs"]
+    result = await get_result(app, requeststr)
+    if result.get("status") != 0:
+        flash(
+            _("Failed to retrieve the list of cogs from the bot. Please try again."),
+            category="danger",
+        )
+        return redirect(url_for("base_blueprint.index"))
+    cogs = result["cogs"]
     cogs_form: CogsForm = CogsForm(cogs=cogs)
     if cogs_form.submit.data:
         if cogs_form.validate_on_submit():
@@ -1492,7 +1499,8 @@ async def cog_management(
         "method": "DASHBOARDRPC_COGMANAGEMENT__GET_APPLICATION_COMMANDS",
         "params": [current_user.id],
     }
-    application_commands = (await get_result(app, requeststr))["application_commands"]
+    result = await get_result(app, requeststr)
+    application_commands = result["application_commands"] if result.get("status") == 0 else {}
     sync_application_commands_form: SyncApplicationCommandsForm = SyncApplicationCommandsForm()
     if sync_application_commands_form.submit.data:
         if sync_application_commands_form.validate_on_submit():
