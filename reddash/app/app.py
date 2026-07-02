@@ -126,7 +126,8 @@ class FlaskApp(Flask):
         self.config["LAST_RPC_EVENT"]: datetime.datetime = self.config["LAUNCH"]
         await self.task_manager.update_data_variables("DASHBOARDRPC__GET_DATA")
         await self.task_manager.update_data_variables(
-            "DASHBOARDRPC__GET_VARIABLES", only_bot_variables=True,
+            "DASHBOARDRPC__GET_VARIABLES",
+            only_bot_variables=True,
         )
         self.task_manager.start_tasks()
 
@@ -159,7 +160,9 @@ class FlaskApp(Flask):
         # t = threading.Thread(target=partial_run)
         if self.cog is not None:
             self.server_thread: ServerThread = ServerThread(
-                app=self, host=self.host, port=self.port,
+                app=self,
+                host=self.host,
+                port=self.port,
             )
             self.server_thread.start()
         else:

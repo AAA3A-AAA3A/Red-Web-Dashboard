@@ -386,7 +386,8 @@ def add_constants(app: Flask) -> None:
         meta["color"] = request.cookies.get("color", meta["default_color"])
         meta["available_colors"]: list[str] = AVAILABLE_COLORS
         meta["background_theme"] = request.cookies.get(
-            "background_theme", meta["default_background_theme"],
+            "background_theme",
+            meta["default_background_theme"],
         )
         meta["sidenav_theme"] = request.cookies.get("sidenav_theme", meta["default_sidenav_theme"])
         return {"meta": meta}
@@ -472,7 +473,8 @@ def add_constants(app: Flask) -> None:
                 del query_params[kwarg]
         new_query_params = {k: v if isinstance(v, str) else v for k, v in query_params.items()}
         new_query_string = urlencode(new_query_params, doseq=True, quote_via=quote_plus).replace(
-            "amp%3B", "",
+            "amp%3B",
+            "",
         )
         updated_url_components = url_components._replace(query=new_query_string)
         if _anchor is not None:
@@ -538,7 +540,7 @@ def add_constants(app: Flask) -> None:
         variables["selectedlocale"] = session.get("lang_code")
         variables["sidenav"] = process_sidenav()
         uptime = datetime.datetime.fromtimestamp(app.variables["stats"]["uptime"])
-        utc_now = datetime.datetime.utcnow().replace(second=0, microsecond=0)
+        utc_now = datetime.datetime.now(tz=datetime.timezone.utc).replace(second=0, microsecond=0)
         real_timedelta = utc_now - uptime
         timedelta: datetime.timedelta = utc_now - uptime.replace(
             hour=utc_now.hour if real_timedelta > datetime.timedelta(days=30) else uptime.hour,
@@ -671,7 +673,10 @@ def check_for_disconnect(app: Flask, result: dict[str, typing.Any]) -> bool:
 
 
 async def get_result(
-    app: Flask, request: dict[str, typing.Any], *, retry: bool = True,
+    app: Flask,
+    request: dict[str, typing.Any],
+    *,
+    retry: bool = True,
 ) -> dict[str, typing.Any]:
     if app.cog is not None:
         from aiohttp_json_rpc.protocol import JsonRpcMsg, JsonRpcMsgTyp
@@ -730,7 +735,9 @@ def notify_owner_of_blacklist(app: Flask, ip: str) -> None:
 
 # This is taken from Red-DiscordBot's `chat_formatting.py` (https://github.com/Cog-Creators/Red-DiscordBot/blob/V3/develop/redbot/core/utils/chat_formatting.py#L521-L574).
 def humanize_timedelta(
-    *, timedelta: datetime.timedelta | None = None, seconds: int | None = None,
+    *,
+    timedelta: datetime.timedelta | None = None,
+    seconds: int | None = None,
 ) -> str:
     """
     Get a locale aware human timedelta representation.

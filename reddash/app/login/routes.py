@@ -115,7 +115,9 @@ async def callback():
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     async with aiohttp.ClientSession() as aiohttp_session:
         async with aiohttp_session.post(
-            "https://discordapp.com/api/v9/oauth2/token", data=data, headers=headers,
+            "https://discordapp.com/api/v9/oauth2/token",
+            data=data,
+            headers=headers,
         ) as r:
             response = await r.json()
             try:
@@ -131,7 +133,8 @@ async def callback():
                 return redirect(url_for("login_blueprint.login", next=request.args.get("next")))
 
         async with aiohttp_session.get(
-            "https://discordapp.com/api/v9/users/@me", headers={"Authorization": f"Bearer {token}"},
+            "https://discordapp.com/api/v9/users/@me",
+            headers={"Authorization": f"Bearer {token}"},
         ) as r:
             new_data = await r.json()
             try:
