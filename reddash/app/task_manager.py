@@ -2,7 +2,6 @@
 The base of the RPC management has been done by Neuro Assassin (https://github.com/Cog-Creators/Red-Dashboard)!
 """
 
-
 import asyncio
 import datetime
 import threading
@@ -20,7 +19,10 @@ class TaskManager:
         self.ignore_disconnect = False
 
     async def update_data_variables(
-        self, method: str, once: bool = True, only_bot_variables: bool = False,
+        self,
+        method: str,
+        once: bool = True,
+        only_bot_variables: bool = False,
     ) -> None:
         try:
             while True:
@@ -106,7 +108,8 @@ class TaskManager:
                     version = result["version"]
         except Exception as e:
             self.app.logger.exception(
-                "Background task `DASHBOARDRPC__CHECK_VERSION` died unexpectedly.", exc_info=e,
+                "Background task `DASHBOARDRPC__CHECK_VERSION` died unexpectedly.",
+                exc_info=e,
             )
 
     async def check_if_connected(self) -> None:

@@ -1,4 +1,3 @@
-
 import base64
 
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -164,7 +163,8 @@ async def third_party(name: str, page: str = None, guild_id: str = None):
         name = next((key for key in third_parties if key.lower() == name.lower()), None)
         if name is None:
             return abort(
-                404, description=_("Looks like that third party doesn't exist... Strange..."),
+                404,
+                description=_("Looks like that third party doesn't exist... Strange..."),
             )
     if name in app.data["disabled_third_parties"]:
         return abort(403, description=_("This third party is disabled."))
@@ -276,11 +276,15 @@ async def third_party(name: str, page: str = None, guild_id: str = None):
                         **value,
                     )
                     result["web_content"]["source"] += "\n\n" + result["web_content"][key].to_html(
-                        key, render_template_string=False,
+                        key,
+                        render_template_string=False,
                     )
             if result["web_content"].get("standalone", False):
                 return render_template_string(
-                    name=name, page=page, **return_guild, **result["web_content"],
+                    name=name,
+                    page=page,
+                    **return_guild,
+                    **result["web_content"],
                 )
             return render_template(
                 "pages/third_parties/third_party.html",
@@ -315,6 +319,7 @@ async def third_party(name: str, page: str = None, guild_id: str = None):
         raise
     except Exception as e:
         app.logger.error(
-            f"Error in the page `{page or 'Main Page'}` of the third party `{name}`.", exc_info=e,
+            f"Error in the page `{page or 'Main Page'}` of the third party `{name}`.",
+            exc_info=e,
         )
         return abort(500, description=_("An error occurred while processing your request."))
