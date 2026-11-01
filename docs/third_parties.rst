@@ -25,7 +25,7 @@ How It Works
 If you are an end user, you can skip this section unless you want to understand how third parties function. If you are a cog creator who wants to integrate Red-Web-Dashboard with your cogs, please continue reading.
 
 On the Red-Web-Dashboard Side
-=========================
+=============================
 
 Red-Web-Dashboard adds two endpoints: ``/third-party/<cog_name>/[page]?**[params]`` and ``/dashboard/<guild_id>/third-party/<cog_name>/[page]?**[params]``. The local Dashboard cog sends the list of third parties and pages to Red-Web-Dashboard through the get_variables RPC method, which is called at regular intervals to ensure the cog and page exist.
 
@@ -47,6 +47,8 @@ The API endpoint supports several keys:
 
 - ``status`` (``int``): This field is not used, but any request response should have it. Use ``0`` if the request is successful.
 
+- ``raw_response`` (``Dict``): Returns bytes with an HTTP status, content type, and a restricted set of response headers. This takes precedence over the other response fields. See `Serving static assets and raw responses`_ for the format and security requirements.
+
 - ``data`` (``Dict``): The data will be returned directly as JSON, and all other fields will be ignored.
 
 - ``notifications`` (``List[Dict[Literal["message", "category"], str]]``): A list of notifications to display to the user. Each notification is a dict with a ``category`` (``info``, ``warning``, ``error``, or ``success``) and a ``message`` (e.g., ``[{"message": "Hi!", "category": "success"}]``).
@@ -60,6 +62,141 @@ The API endpoint supports several keys:
 - ``redirect_url`` (``str``): A URL to redirect the user to. The user will be redirected to the provided URL. Any external website will be ignored.
 
 If content fields are not passed, the data will be returned directly as JSON.
+
+Serving static assets and raw responses
+=======================================
+
+Use a page named ``static`` to serve JavaScript, CSS, fonts, images, or other files
+from your cog. Register it with ``methods=("GET", "HEAD")`` and accept an
+``asset_path`` argument. The Dashboard exposes it at
+``/third-party/<cog_name>/static/<asset_path>``; nested paths are supported. For
+example, ``/third-party/MyCog/static/assets/app.js`` calls the cog's ``static``
+page with ``asset_path="assets/app.js"``. Cog names are matched without regard
+to case. Hidden pages remain accessible by URL; ``hidden=True`` only hides a
+page from navigation.
+
+Return an outer ``status`` of ``0`` and a ``raw_response`` dict containing:
+
+* ``body_base64`` (required): the response bytes encoded using standard Base64,
+  as an ASCII string. Invalid Base64 produces an HTTP 500 response.
+* ``content_type``: the MIME type, such as ``text/javascript``, ``text/css``,
+  ``image/png``, or ``font/woff2``. The default is
+  ``application/octet-stream``. Use the correct MIME type because browsers are
+  instructed not to sniff the content type.
+* ``status``: the HTTP status code, defaulting to ``200``. This differs from
+  the outer RPC ``status``.
+* ``headers``: an optional dict. Only ``Cache-Control``,
+  ``Content-Disposition``, ``Content-Language``, ``ETag``, ``Expires``,
+  ``Last-Modified``, and ``Vary`` are forwarded, with case-insensitive header names. Other
+  headers, including ``Set-Cookie`` and security-header overrides, are ignored.
+
+The static endpoint only accepts raw responses or ``error_code`` responses.
+The Dashboard suppresses the HTTP response body for ``HEAD`` requests. Normal
+third-party pages and API endpoints can also return ``raw_response``.
+
+For example, add this method to the integration class shown later in this guide
+(using the same ``dashboard_page`` decorator):
+
+.. code-block:: python
+
+    import base64
+    import mimetypes
+    from pathlib import Path
+
+    ASSET_ROOT = Path(__file__).parent / "static"
+
+    @dashboard_page(name="static", methods=("GET", "HEAD"), hidden=True)
+    async def static_asset(self, asset_path: str, **kwargs):
+        not_found = {"status": 1, "error_code": 404}
+        # Validate here too: a cog may also be called through other routes.
+        if (
+            not asset_path
+            or ":" in asset_path
+            or "\\" in asset_path
+            or any(ord(char) < 32 or ord(char) == 127 for char in asset_path)
+            or any(part in ("", ".", "..") for part in asset_path.split("/"))
+        ):
+            return not_found
+        try:
+            base = ASSET_ROOT.resolve()
+            target = (base / asset_path).resolve()
+            if not target.is_relative_to(base) or not target.is_file():
+                return not_found
+            body = target.read_bytes()
+        except (OSError, RuntimeError, ValueError):
+            return not_found
+        return {
+            "status": 0,
+            "raw_response": {
+                "body_base64": base64.b64encode(body).decode("ascii"),
+                "content_type": (
+                    mimetypes.guess_type(target.name)[0]
+                    or "application/octet-stream"
+                ),
+                "headers": {"Cache-Control": "public, max-age=3600"},
+            },
+        }
+
+An HTML page can reference these files using absolute URLs, for example
+``<script src="/third-party/MyCog/static/assets/app.js"></script>`` and
+``<link rel="stylesheet" href="/third-party/MyCog/static/assets/app.css">``.
+Use ``web_content`` for an interactive HTML page, including
+``"standalone": True`` when you need a complete document.
+
+Security and caching
+--------------------
+
+* **Raw documents are sandboxed.** Every raw response gets
+  ``X-Content-Type-Options: nosniff`` and
+  ``Content-Security-Policy: sandbox``. This prevents raw HTML, SVG, and XML
+  documents from running scripts with the Dashboard's origin privileges when
+  opened directly or framed. Cogs cannot weaken these headers. An optional
+  ``Content-Disposition: attachment`` can request a download instead.
+* **Only serve trusted application code.** Sandboxing a raw response does not
+  sandbox the page that embeds it as a script. JavaScript served by a cog and
+  included by a Dashboard page runs with that page's privileges. Never serve
+  user-uploaded scripts as application assets or interpolate untrusted HTML
+  into ``web_content``. Third-party cogs and their templates are trusted code;
+  these protections do not isolate a malicious installed cog.
+* **Constrain filesystem access in the cog.** The Dashboard rejects colons
+  (including Windows drive paths and alternate data streams), backslashes,
+  control characters, absolute paths, empty path components, and ``.``/``..``
+  components. The cog must also resolve both its asset root and the requested
+  path, then check ``target.is_relative_to(base)`` before reading. This catches
+  symlinks that escape the root. Keep the asset directory read-only to
+  untrusted users so they cannot swap a checked file or symlink before it is
+  read. Do not decode or normalize the path again after validation.
+* **Static requests are read-only and do not carry CSRF secrets.** The
+  dedicated static endpoint does not generate a CSRF token or persist locale
+  changes. It passes ``csrf_token=("", "")``,
+  ``wtf_csrf_secret_key=""`` (decoded to ``b""`` by the local Dashboard cog),
+  and a fixed ``en_US`` locale through RPC. Do not instantiate forms or perform
+  state changes in a static handler. Normal pages keep their CSRF behavior.
+* **Public caching is only for identical, public assets.** A successful static
+  response without user/owner context, request cookies, session changes, or
+  response cookies may retain the cog's ``Cache-Control: public`` header.
+  All other third-party page and static responses are forced to
+  ``Cache-Control: private, no-store``, overriding ``public`` and shared-cache
+  directives such as ``s-maxage``. Responses vary on ``Cookie``. At the origin,
+  cookie-bearing requests remain private even when the underlying asset is
+  public, including when Flask refreshes an existing session cookie after
+  response processing.
+  Configure proxies and CDNs to respect these headers; do not use rules that
+  cache everything regardless of cookies or cache directives.
+  Some CDNs, including `Cloudflare
+  <https://developers.cloudflare.com/cache/concepts/cache-control/#other>`_,
+  ignore ``Vary: Cookie`` by default and can serve an already cached public
+  asset to a cookie-bearing request without contacting the origin. Configure
+  cache bypass for session cookies wherever a URL can vary by authentication.
+  Purge existing cached responses when changing a URL from public to protected.
+* **Declare access requirements.** Add ``user_id`` or ``user`` to a handler's
+  signature for login, and ``is_owner=True`` for owner-only access. Static
+  handlers enforce the page's login and owner requirements, returning HTTP 401
+  for anonymous requests that require login. The dedicated static endpoint
+  rejects pages requiring guild context with HTTP 400. Personalized
+  downloads, session tickets, and sensitive JSON must stay private; never put
+  secrets in public static files. Prefer content-hashed filenames for bundles
+  that are publicly cached.
 
 On the Dashboard Local Cog Side
 ===============================

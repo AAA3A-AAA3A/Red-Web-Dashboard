@@ -289,6 +289,15 @@ def register_extensions(_app: Flask) -> None:
             return None
         return user
 
+    # Register before Talisman so this runs after its response hook and keeps
+    # its default document policy from replacing the raw-response sandbox.
+    @app.after_request
+    def sandbox_raw_third_party_responses(response):
+        if g.get("raw_third_party_response", False):
+            response.headers["Content-Security-Policy"] = "sandbox"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
     # https://github.com/GoogleCloudPlatform/flask-talisman
     app.talisman: Talisman = Talisman()
     old_force_https = app.talisman._force_https
@@ -719,6 +728,8 @@ def initialize_babel(app: Flask) -> None:
 
     @app.before_request
     def pull_locale() -> None:
+        if request.endpoint == "third_parties_blueprint.third_party_static":
+            return
         # Locale is determined in the following priority:
         # - `lang_code` kwarg
         # - `lang_code` cookie

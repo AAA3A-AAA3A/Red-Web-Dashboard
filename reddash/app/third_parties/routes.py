@@ -1,4 +1,5 @@
 import base64
+import binascii
 
 from django.utils.http import url_has_allowed_host_and_scheme
 from flask import (
@@ -6,6 +7,7 @@ from flask import (
     flash,
     g,
     jsonify,
+    make_response,
     redirect,
     render_template,
     render_template_string,
@@ -27,6 +29,185 @@ from reddash.app.utils import get_result  # , get_user_id
 from . import blueprint
 
 # <---------- Third Parties ---------->
+
+_RAW_RESPONSE_ALLOWED_HEADERS = frozenset(
+    header.lower()
+    for header in (
+        "Cache-Control",
+        "ETag",
+        "Last-Modified",
+        "Expires",
+        "Vary",
+        "Content-Disposition",
+        "Content-Language",
+    )
+)
+
+
+def _resolve_third_party_name(name: str) -> str | None:
+    third_parties = app.variables["third_parties"]
+    name = name.strip()
+    if name in third_parties:
+        return name
+    return next((key for key in third_parties if key.lower() == name.lower()), None)
+
+
+def _is_safe_asset_path(asset_path: str) -> bool:
+    # Flask has already URL-decoded the path. Reject Windows drives, UNC
+    # paths and alternate data streams as well as POSIX traversal.
+    return (
+        bool(asset_path)
+        and not any(char in asset_path for char in ("\\", ":"))
+        and not any(ord(char) < 32 or ord(char) == 127 for char in asset_path)
+        and all(part not in ("", ".", "..") for part in asset_path.split("/"))
+    )
+
+
+async def _check_third_party_page_access(
+    name: str,
+    page_key: str,
+    *,
+    page: str | None = None,
+    guild_id: str | None = None,
+    login_redirect: bool = True,
+) -> tuple[dict, dict]:
+    page_data = app.variables["third_parties"][name][page_key]
+    context_ids = {}
+    if "user_id" in page_data["context_ids"]:
+        if current_user.is_authenticated:
+            context_ids["user_id"] = (
+                current_user.id
+            )  # int(get_user_id(app=app, req=request, ses=session))
+        elif login_redirect:
+            abort(redirect(make_login_url("login_blueprint.login", next_url=request.url)))
+        else:
+            abort(401, description=_("You must be logged in to access this page."))
+    if page_data["is_owner"] and not (current_user.is_authenticated and current_user.is_owner):
+        abort(403, description=_("You must be the owner of the bot to access this page."))
+    if "guild_id" in page_data["context_ids"]:
+        try:
+            context_ids["guild_id"] = int(guild_id)
+        except (TypeError, ValueError):
+            abort(
+                redirect(
+                    make_login_url(
+                        "base_blueprint.dashboard",
+                        next_url=url_for(
+                            "third_parties_blueprint.third_party",
+                            name=name,
+                            page=page,
+                            guild_id="GUILD_ID",
+                            **request.args,
+                        ),
+                    ),
+                ),
+            )
+        return_guild = await get_guild(context_ids["guild_id"], for_third_parties=True)
+        if return_guild["guild"]["status"] == 1:
+            abort(jsonify(return_guild["guild"]))
+    else:
+        return_guild = {}
+    return context_ids, return_guild
+
+
+def _build_raw_response(raw_response):
+    try:
+        body = base64.b64decode(raw_response["body_base64"], validate=True)
+    except (binascii.Error, KeyError, TypeError, ValueError):
+        return abort(500, description=_("Invalid raw third-party response."))
+
+    response = make_response(body, raw_response.get("status", 200))
+    response.headers["Content-Type"] = raw_response.get(
+        "content_type",
+        "application/octet-stream",
+    )
+    for header, value in raw_response.get("headers", {}).items():
+        header, value = str(header), str(value)
+        if header.lower() not in _RAW_RESPONSE_ALLOWED_HEADERS or any(
+            char in value for char in "\r\n\x00"
+        ):
+            app.logger.debug(f"Dropping disallowed raw third-party response header `{header}`.")
+            continue
+        response.headers[header] = value
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Raw documents (including HTML, SVG and XML) must never gain the
+    # Dashboard's origin privileges. This does not sandbox embedding pages.
+    response.headers["Content-Security-Policy"] = "sandbox"
+    g.raw_third_party_response = True
+    return response
+
+
+@blueprint.after_request
+def protect_third_party_cache(response):
+    if request.endpoint in (
+        "third_parties_blueprint.third_party",
+        "third_parties_blueprint.third_party_static",
+    ):
+        response.vary.add("Cookie")
+        # Session cookies can also be refreshed after response hooks run.
+        # Only successful, anonymous, session-free assets may be shared.
+        if (
+            not g.get("third_party_public_asset", False)
+            or response.status_code != 200
+            or request.cookies
+            or session.modified
+            or "Set-Cookie" in response.headers
+        ):
+            response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+async def _call_third_party_page(
+    *,
+    method: str,
+    name: str,
+    page: str | None,
+    context_ids=None,
+    required_kwargs=None,
+    optional_kwargs=None,
+    extra_kwargs=None,
+    data=None,
+    include_csrf=True,
+):
+    if context_ids is None:
+        context_ids = {}
+    if required_kwargs is None:
+        required_kwargs = {}
+    if optional_kwargs is None:
+        optional_kwargs = {}
+    if extra_kwargs is None:
+        extra_kwargs = {}
+    if data is None:
+        data = {"form": {}, "json": {}}
+
+    # Keep the existing RPC signature compatible without exposing CSRF
+    # material or creating a session for read-only asset requests.
+    csrf_token = ("", "")
+    csrf_secret = ""
+    if include_csrf:
+        generate_csrf()
+        csrf_token = (session["csrf_token"], g.csrf_token)
+        csrf_secret = base64.urlsafe_b64encode(app.config["WTF_CSRF_SECRET_KEY"]).decode()
+    requeststr = {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "DASHBOARDRPC_THIRDPARTIES__DATA_RECEIVE",
+        "params": [
+            method,
+            name,
+            page,
+            request.url,
+            csrf_token,
+            csrf_secret,
+            context_ids,
+            required_kwargs,
+            optional_kwargs,
+            extra_kwargs,
+            data,
+            app.extensions["babel"].locale_selector() if include_csrf else "en_US",
+        ],
+    }
+    return await get_result(app, requeststr)
 
 
 @app.csrf_protect.exempt
@@ -54,7 +235,7 @@ async def webhook_route():
             "params": [payload],
         }
         return await get_result(app, requeststr)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - Convert RPC failures to an HTTP response.
         app.logger.error("Error sending webhook data.", exc_info=e)
 
 
@@ -88,6 +269,56 @@ async def third_parties(third_party: str | None = None):
         if third_party is None or third_party not in return_third_parties["third_parties"]
         else third_party,
     )
+
+
+@blueprint.route("/third-party/<name>/static/<path:asset_path>", methods=("GET", "HEAD"))
+async def third_party_static(name: str, asset_path: str):
+    if not _is_safe_asset_path(asset_path):
+        return abort(404)
+    third_parties = app.variables["third_parties"]
+    name = _resolve_third_party_name(name)
+    if name is None:
+        return abort(404, description=_("Looks like that third party doesn't exist... Strange..."))
+    if name in app.data["disabled_third_parties"]:
+        return abort(403, description=_("This third party is disabled."))
+    if "static" not in third_parties[name]:
+        return abort(404, description=_("Looks like that page doesn't exist... Strange..."))
+    if request.method not in third_parties[name]["static"]["methods"]:
+        return abort(405, description=_("Method not allowed."))
+    if "guild_id" in third_parties[name]["static"]["context_ids"]:
+        return abort(400, description=_("Static pages cannot require a guild context."))
+    context_ids, _return_guild = await _check_third_party_page_access(
+        name,
+        "static",
+        login_redirect=False,
+    )
+
+    try:
+        result = await _call_third_party_page(
+            method=request.method,
+            name=name,
+            page="static",
+            context_ids=context_ids,
+            required_kwargs={"asset_path": asset_path},
+            include_csrf=False,
+        )
+        if "raw_response" in result:
+            g.third_party_public_asset = (
+                not third_parties[name]["static"]["context_ids"]
+                and not third_parties[name]["static"]["is_owner"]
+            )
+            return _build_raw_response(result["raw_response"])
+        if "error_code" in result:
+            return abort(result["error_code"], description=result.get("error_message"))
+        return abort(500, description=_("Invalid raw third-party response."))
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 - Convert RPC failures to an HTTP response.
+        app.logger.error(
+            f"Error in static asset `{asset_path}` of third party `{name}`.",
+            exc_info=e,
+        )
+        return abort(500, description=_("An error occurred while processing your request."))
 
 
 @blueprint.route(
@@ -158,14 +389,12 @@ async def third_parties(third_party: str | None = None):
 )
 async def third_party(name: str, page: str | None = None, guild_id: str | None = None):
     third_parties = app.variables["third_parties"]
-    name = name.strip()
-    if name not in third_parties:
-        name = next((key for key in third_parties if key.lower() == name.lower()), None)
-        if name is None:
-            return abort(
-                404,
-                description=_("Looks like that third party doesn't exist... Strange..."),
-            )
+    name = _resolve_third_party_name(name)
+    if name is None:
+        return abort(
+            404,
+            description=_("Looks like that third party doesn't exist... Strange..."),
+        )
     if name in app.data["disabled_third_parties"]:
         return abort(403, description=_("This third party is disabled."))
     if page is not None:
@@ -179,37 +408,12 @@ async def third_party(name: str, page: str | None = None, guild_id: str | None =
     if request.method not in third_parties[name][_page]["methods"]:
         return abort(405, description=_("Method not allowed."))
 
-    context_ids = {}
-    if "user_id" in third_parties[name][_page]["context_ids"]:
-        if current_user.is_authenticated:
-            context_ids["user_id"] = (
-                current_user.id
-            )  # int(get_user_id(app=app, req=request, ses=session))
-        else:
-            return redirect(make_login_url("login_blueprint.login", next_url=request.url))
-    if third_parties[name][_page]["is_owner"] and not current_user.is_owner:
-        return abort(403, description=_("You must be the owner of the bot to access this page."))
-    if "guild_id" in third_parties[name][_page]["context_ids"]:
-        try:
-            context_ids["guild_id"] = int(guild_id)
-        except (TypeError, ValueError):
-            return redirect(
-                make_login_url(
-                    "base_blueprint.dashboard",
-                    next_url=url_for(
-                        "third_parties_blueprint.third_party",
-                        name=name,
-                        page=page,
-                        guild_id="GUILD_ID",
-                        **request.args,
-                    ),
-                ),
-            )
-        return_guild = await get_guild(context_ids["guild_id"], for_third_parties=True)
-        if return_guild["guild"]["status"] == 1:
-            return return_guild["guild"]
-    else:
-        return_guild = {}
+    context_ids, return_guild = await _check_third_party_page_access(
+        name,
+        _page,
+        page=page,
+        guild_id=guild_id,
+    )
 
     kwargs = request.args.copy()
     required_kwargs = {}
@@ -227,6 +431,8 @@ async def third_party(name: str, page: str | None = None, guild_id: str | None =
         if key not in kwargs:
             return render_template("errors/custom.html", error_title=f"Missing argument: `{key}`.")
         required_kwargs[key] = kwargs.pop(key)
+    if page == "static" and not _is_safe_asset_path(required_kwargs.get("asset_path", "")):
+        return abort(404)
     for key in kwargs.copy():
         if key in third_parties[name][_page]["optional_kwargs"]:
             optional_kwargs[key] = kwargs.pop(key)
@@ -241,28 +447,19 @@ async def third_party(name: str, page: str | None = None, guild_id: str | None =
     )
 
     try:
-        generate_csrf()
-        requeststr = {
-            "jsonrpc": "2.0",
-            "id": 0,
-            "method": "DASHBOARDRPC_THIRDPARTIES__DATA_RECEIVE",
-            "params": [
-                request.method,
-                name,
-                page,
-                request.url,
-                (session["csrf_token"], g.csrf_token),
-                base64.urlsafe_b64encode(app.config["WTF_CSRF_SECRET_KEY"]).decode(),
-                context_ids,
-                required_kwargs,
-                optional_kwargs,
-                extra_kwargs,
-                data,
-                app.extensions["babel"].locale_selector(),
-            ],
-        }
-        result = await get_result(app, requeststr)
+        result = await _call_third_party_page(
+            method=request.method,
+            name=name,
+            page=page,
+            context_ids=context_ids,
+            required_kwargs=required_kwargs,
+            optional_kwargs=optional_kwargs,
+            extra_kwargs=extra_kwargs,
+            data=data,
+        )
 
+        if "raw_response" in result:
+            return _build_raw_response(result["raw_response"])
         if "data" in result:
             return result["data"]
         if "notifications" in result:
@@ -310,14 +507,14 @@ async def third_party(name: str, page: str | None = None, guild_id: str | None =
                 error_message=result.get("error_message"),
             )
         if "redirect_url" in result:
-            # `url_has_allowed_host_and_scheme`` should check if the url is safe for redirects, meaning it matches the request host.
+            # Check if the URL is safe for redirects (matches the request host).
             if not url_has_allowed_host_and_scheme(result["redirect_url"], request.host):
                 return abort(400)
             return redirect(result["redirect_url"])
         return result
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - Convert RPC failures to an HTTP response.
         app.logger.error(
             f"Error in the page `{page or 'Main Page'}` of the third party `{name}`.",
             exc_info=e,
