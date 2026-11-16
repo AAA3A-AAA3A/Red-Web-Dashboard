@@ -253,6 +253,7 @@ class AssetCacheSecurityTests(ThirdPartyRequestTestCase):
             ({"web_content": {"source": "not an asset"}}, 500),
             ({"raw_response": {"body_base64": "!!!"}}, 500),
             ({"raw_response": {**raw_response(), "status": 404}}, 404),
+            ({"raw_response": {**raw_response(), "status": 600}}, 500),
         ):
             with self.subTest(result=result):
                 self.rpc.return_value = result
@@ -314,6 +315,21 @@ class RawResponseSecurityTests(ThirdPartyRequestTestCase):
                 self.assertEqual(response.data, body)
                 self.assertEqual(response.mimetype, content_type)
                 self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+
+    def test_valid_statuses_are_forwarded(self):
+        for status in (100, 200, 206, 404, 503, 599):
+            with self.subTest(status=status), app.test_request_context():
+                response = routes._build_raw_response({**raw_response(), "status": status})
+                self.assertEqual(response.status_code, status)
+
+    def test_invalid_statuses_return_500(self):
+        for status in (99, 600, 0, -200, True, 200.5, "200", None, [200]):
+            with (
+                self.subTest(status=status),
+                app.test_request_context(),
+                self.assertRaises(InternalServerError),
+            ):
+                routes._build_raw_response({**raw_response(), "status": status})
 
     def test_invalid_body_returns_500(self):
         for payload in ({}, {"body_base64": "!!!"}, {"body_base64": None}):

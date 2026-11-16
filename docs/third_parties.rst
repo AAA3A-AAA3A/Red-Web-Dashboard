@@ -83,8 +83,9 @@ Return an outer ``status`` of ``0`` and a ``raw_response`` dict containing:
   ``image/png``, or ``font/woff2``. The default is
   ``application/octet-stream``. Use the correct MIME type because browsers are
   instructed not to sniff the content type.
-* ``status``: the HTTP status code, defaulting to ``200``. This differs from
-  the outer RPC ``status``.
+* ``status``: the HTTP status code, defaulting to ``200``. It must be an
+  integer between ``100`` and ``599``; any other value produces an HTTP 500
+  response. This differs from the outer RPC ``status``.
 * ``headers``: an optional dict. Only ``Cache-Control``,
   ``Content-Disposition``, ``Content-Language``, ``ETag``, ``Expires``,
   ``Last-Modified``, and ``Vary`` are forwarded, with case-insensitive header names. Other

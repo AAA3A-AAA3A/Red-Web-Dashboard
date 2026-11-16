@@ -116,7 +116,12 @@ def _build_raw_response(raw_response):
     except (binascii.Error, KeyError, TypeError, ValueError):
         return abort(500, description=_("Invalid raw third-party response."))
 
-    response = make_response(body, raw_response.get("status", 200))
+    status = raw_response.get("status", 200)
+    # `True`/`False` are `int`s but fall outside the valid range.
+    if not isinstance(status, int) or not 100 <= status <= 599:
+        return abort(500, description=_("Invalid raw third-party response."))
+
+    response = make_response(body, status)
     response.headers["Content-Type"] = raw_response.get(
         "content_type",
         "application/octet-stream",
