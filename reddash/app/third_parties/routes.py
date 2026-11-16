@@ -167,7 +167,7 @@ async def _call_third_party_page(
     optional_kwargs=None,
     extra_kwargs=None,
     data=None,
-    include_csrf=True,
+    for_static_asset=False,
 ):
     if context_ids is None:
         context_ids = {}
@@ -184,7 +184,7 @@ async def _call_third_party_page(
     # material or creating a session for read-only asset requests.
     csrf_token = ("", "")
     csrf_secret = ""
-    if include_csrf:
+    if not for_static_asset:
         generate_csrf()
         csrf_token = (session["csrf_token"], g.csrf_token)
         csrf_secret = base64.urlsafe_b64encode(app.config["WTF_CSRF_SECRET_KEY"]).decode()
@@ -204,7 +204,8 @@ async def _call_third_party_page(
             optional_kwargs,
             extra_kwargs,
             data,
-            app.extensions["babel"].locale_selector() if include_csrf else "en_US",
+            # Asset requests must not persist a locale choice in the session.
+            "en_US" if for_static_asset else app.extensions["babel"].locale_selector(),
         ],
     }
     return await get_result(app, requeststr)
@@ -300,7 +301,7 @@ async def third_party_static(name: str, asset_path: str):
             page="static",
             context_ids=context_ids,
             required_kwargs={"asset_path": asset_path},
-            include_csrf=False,
+            for_static_asset=True,
         )
         if "raw_response" in result:
             g.third_party_public_asset = (
