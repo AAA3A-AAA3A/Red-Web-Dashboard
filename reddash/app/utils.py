@@ -289,7 +289,9 @@ def register_extensions(_app: Flask) -> None:
             return None
         return user
 
-    # Register before Talisman so this runs after its response hook and keeps
+    # Raw documents (including HTML, SVG and XML) must never gain the
+    # Dashboard's origin privileges. This does not sandbox embedding pages.
+    # Registered before Talisman so it runs after its response hook and keeps
     # its default document policy from replacing the raw-response sandbox.
     @app.after_request
     def sandbox_raw_third_party_responses(response):

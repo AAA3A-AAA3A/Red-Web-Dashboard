@@ -129,10 +129,8 @@ def _build_raw_response(raw_response):
             app.logger.debug(f"Dropping disallowed raw third-party response header `{header}`.")
             continue
         response.headers[header] = value
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    # Raw documents (including HTML, SVG and XML) must never gain the
-    # Dashboard's origin privileges. This does not sandbox embedding pages.
-    response.headers["Content-Security-Policy"] = "sandbox"
+    # `sandbox_raw_third_party_responses` applies the security headers after
+    # Talisman has had its say, so they are not set here.
     g.raw_third_party_response = True
     return response
 

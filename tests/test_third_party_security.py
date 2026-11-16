@@ -77,7 +77,7 @@ class AssetPathSecurityTests(unittest.TestCase):
                 self.assertTrue(routes._is_safe_asset_path(asset_path))
 
 
-class AssetCacheSecurityTests(unittest.TestCase):
+class ThirdPartyRequestTestCase(unittest.TestCase):
     def setUp(self):
         self.page = {
             "methods": ("GET", "HEAD"),
@@ -102,6 +102,12 @@ class AssetCacheSecurityTests(unittest.TestCase):
         self.addCleanup(rpc_patch.stop)
         rpc_patch.start()
 
+    def get_asset(self, **raw_response_kwargs):
+        self.rpc.return_value = {"raw_response": raw_response(**raw_response_kwargs)}
+        return self.client.get("/third-party/Test/static/assets/main.js")
+
+
+class AssetCacheSecurityTests(ThirdPartyRequestTestCase):
     def test_anonymous_static_assets_have_no_session_or_csrf_material(self):
         with patch.object(routes, "generate_csrf") as generate:
             for method in ("GET", "HEAD"):
@@ -260,7 +266,7 @@ class AssetCacheSecurityTests(unittest.TestCase):
         self.rpc.assert_not_awaited()
 
 
-class RawResponseSecurityTests(unittest.TestCase):
+class RawResponseSecurityTests(ThirdPartyRequestTestCase):
     def test_raw_documents_are_sandboxed(self):
         for content_type in (
             "text/html; charset=utf-8",
@@ -270,30 +276,27 @@ class RawResponseSecurityTests(unittest.TestCase):
             "application/xhtml+xml",
             "application/custom+xml",
         ):
-            with self.subTest(content_type=content_type), app.test_request_context():
+            with self.subTest(content_type=content_type):
                 body = b"<script>parent.compromised = true</script>"
-                response = routes._build_raw_response(raw_response(body, content_type))
+                response = self.get_asset(body=body, content_type=content_type)
                 self.assertEqual(response.data, body)
                 self.assertEqual(response.headers["Content-Type"], content_type)
                 self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
                 self.assertEqual(response.headers["Content-Security-Policy"], "sandbox")
 
     def test_cogs_cannot_override_security_or_set_cookies(self):
-        with app.test_request_context():
-            response = routes._build_raw_response(
-                raw_response(
-                    headers={
-                        "cOnTeNt-SeCuRiTy-PoLiCy": "sandbox allow-scripts allow-same-origin",
-                        "X-Content-Type-Options": "",
-                        "Content-Type": "text/html",
-                        "Set-Cookie": "session=attacker",
-                        "Location": "https://example.com",
-                        "Service-Worker-Allowed": "/",
-                        "cAcHe-CoNtRoL": "public, max-age=3600",
-                        "ETag": '"bundle-v1"',
-                    },
-                ),
-            )
+        response = self.get_asset(
+            headers={
+                "cOnTeNt-SeCuRiTy-PoLiCy": "sandbox allow-scripts allow-same-origin",
+                "X-Content-Type-Options": "",
+                "Content-Type": "text/html",
+                "Set-Cookie": "session=attacker",
+                "Location": "https://example.com",
+                "Service-Worker-Allowed": "/",
+                "cAcHe-CoNtRoL": "public, max-age=3600",
+                "ETag": '"bundle-v1"',
+            },
+        )
         self.assertEqual(response.headers["Content-Security-Policy"], "sandbox")
         self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
         self.assertEqual(response.mimetype, "text/javascript")
@@ -305,9 +308,9 @@ class RawResponseSecurityTests(unittest.TestCase):
 
     def test_binary_assets_keep_their_bytes_and_mime_type(self):
         for content_type in ("image/png", "font/woff2", "text/css", "text/javascript"):
-            with self.subTest(content_type=content_type), app.test_request_context():
+            with self.subTest(content_type=content_type):
                 body = bytes(range(256))
-                response = routes._build_raw_response(raw_response(body, content_type))
+                response = self.get_asset(body=body, content_type=content_type)
                 self.assertEqual(response.data, body)
                 self.assertEqual(response.mimetype, content_type)
                 self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
